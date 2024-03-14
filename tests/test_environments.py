@@ -22,11 +22,13 @@ from timor.task.Tolerance import CartesianXYZ
 from timor.utilities import spatial
 from timor.utilities.tolerated_pose import ToleratedPose
 
-from base_opt.utilities import Proxies
-from base_opt.utilities.AsssemblyFilter import RobotLongEnoughFilter
 from mcs.TaskSolver import SimpleHierarchicalTaskSolverWithoutBaseChange
 from mcs.utilities.debug_solution import debug_solution
 from mcs.utilities.default_robots import get_six_axis_modrob_v2
+
+from base_opt.base_opt import config
+from base_opt.utilities import Proxies
+from base_opt.utilities.AsssemblyFilter import RobotLongEnoughFilter
 
 
 class BaseChangeEnvironmentTests(unittest.TestCase):
@@ -111,6 +113,75 @@ class BaseChangeEnvironmentTests(unittest.TestCase):
             env.action2base_pose(np.asarray((0., 0., 0., 0., 0., .25))),
             env.task.base_constraint.base_pose.nominal.in_world_coordinates() @ spatial.rotZ(np.pi / 4)
         )
+
+    def test_base_change_environment_task_solver_integration(self, n_trials=10):
+        """
+        Test that task solver within the base change environment works as expected.
+        """
+        infos_fail = []
+        reward_success = []
+        task_solver_whitman = SimpleHierarchicalTaskSolverWithoutBaseChange(
+            self.task_whitman, timeout=10., maximum_path_deviation=1e-5, safety_margin=0.01)
+        self.assertEqual(task_solver_whitman.safety_margin, 0.01)
+        env = Proxies.BaseChangeEnvironment(
+            self.assembly, task_solver_whitman, CostFunctions.CycleTime(), self.task_whitman)
+        np_test.assert_array_equal([c.safety_margin for c in env.task.constraints if isinstance(c, CollisionFree)], 0.)
+        for _ in range(n_trials):
+            # Rather tight tolerance so any action should have chance to succeed
+            a = env.action_space.sample()
+            desired_base_pose = env.action2base_pose(a)
+            t0 = time.time()
+            obs, reward, done, truncated, info = env.step(a, detailed_info=True)
+            # Env step not a lot longer then task solver timeout
+            self.assertLessEqual(time.time() - t0, env.task_solver.timeout * 2.)
+            self.assertEqual(self.assembly.robot.placement, desired_base_pose)
+            if 'solution' in info and info['solution'] is not None:
+                np_test.assert_almost_equal(
+                    info['solution'].to_json_data()['basePose'][0],
+                    desired_base_pose.homogeneous
+                )
+                if info['solution'].valid:
+                    self.assertEqual(reward, -1. * info['solution'].cost)
+                    self.assertTrue(done)
+                    self.assertFalse(truncated)
+                    self.assertTrue(info['is_success'])
+                    reward_success.append(reward)
+                    continue
+                debug_solution(info['solution'])
+
+            self.assertEqual(reward, env.reward_fail)
+            self.assertTrue(done)  # No second chance here
+            self.assertFalse(truncated)
+            self.assertFalse(info['is_success'])
+            # Check for valid failure reason
+            self.assertTrue(
+                any(info.get(key, False) for key in
+                    ('filter_fail', 'timeout_task_solver', 'path_planning_failed', 'trajectory_generation_failed'))
+                or not info['solution'].valid)
+            infos_fail.append(info)
+        print(f"BaseChangeEnvironment failed {len(infos_fail)} times out of {n_trials} trials.")
+        print(f"Failure reasons: {infos_fail}")
+        print(f"Reward success: {np.mean(reward_success)} +/- {np.std(reward_success)}")
+        self.assertGreaterEqual(0.6, len(infos_fail) / n_trials)  # TODO: Would be great if higher success rate
+
+    def test_base_change_environment_quick_rejection(self, n_trials=10):
+        """Test that far of actions are rejected quickly."""
+        task = deepcopy(self.task_whitman)
+        task.constraints = [c for c in task.constraints if not isinstance(c, BasePlacement)]
+        task.constraints.append(BasePlacement(ToleratedPose(
+            Transformation.from_translation((0., 0., 0.)),
+            CartesianXYZ((-10., 10.), (-10., 10.), (-10., 10.)))))
+        task_solver = config.get_task_solver(task)
+        env = Proxies.BaseChangeEnvironment(self.assembly, task_solver, CostFunctions.CycleTime(), task)
+        run_times = []
+        for _ in range(n_trials):
+            for invalid in [(1., 0., 0.), (-1., 0., 0.), (0., 1., 0.), (0., 0., -1.), (-1., -1., -1.)]:
+                t0 = time.time()
+                obs, reward, done, truncated, info = env.step(np.asarray(invalid), detailed_info=True)
+                run_times.append(time.time() - t0)
+                self.assertTrue(any(isinstance(f, RobotLongEnoughFilter) for f in info['failed_filters']))
+                self.assertFalse(info['is_success'])
+        self.assertLess(np.mean(run_times), .2)  # Should be quick on average  # TODO: Needs better robot len filter
 
 
 if __name__ == '__main__':
