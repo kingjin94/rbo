@@ -1,5 +1,5 @@
 variables:
-  IMAGE_OMPL_TAG: gitlab.lrz.de:5005/tum-cps/mcs/ompl:main
+  IMAGE_OMPL_TAG: ../mcs/ompl:main
 
 default:
   image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/python:3.11
