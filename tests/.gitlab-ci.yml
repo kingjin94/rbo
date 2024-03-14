@@ -1,0 +1,55 @@
+variables:
+  IMAGE_OMPL_TAG: gitlab.lrz.de:5005/tum-cps/mcs/ompl:main
+
+default:
+  image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/python:3.11
+  retry:
+    max: 2
+    when:
+      - unknown_failure
+      - api_failure
+      - stuck_or_timeout_failure
+      - runner_system_failure
+      - data_integrity_failure
+
+stages:
+  - static_check
+  - unittest
+  - report
+
+docstring check:
+  stage: static_check
+  variables:  # Don't need submodules to analyze docstrings
+    GIT_SUBMODULE_STRATEGY: none
+  script:
+    - pip install pydocstyle
+    - cd src/mcs && pydocstyle --match-dir='^((?!demos|\.).)*' --config=../../.pydocstyle
+
+flake8 linting:
+  stage: static_check
+  variables:  # Don't need submodules to analyze linting
+    GIT_SUBMODULE_STRATEGY: none
+  script:
+    - python --version
+    - pip --version
+    - pip install flake8==5.0.4
+    - flake8 --count src/mcs/ tests/
+    # Ignore F821 (undefined name) - in these files the undefined names are only used for type hinting and cannot be properly imported (circular imports)
+    # Ignore F841 (assigned but never used) for unittests as in some cases this helps clarity of the code when an exception raise is checked
+
+unittests:
+  image: $IMAGE_OMPL_TAG
+  stage: unittest
+  script:
+    - pip install -e timor-python/.[full]
+    - pip install -e .[full]  # Make sure C++ bindings are build in src folder
+    - cd src  # Make sure we use local mcs files in import such that coverage can be tracked
+    - coverage run -p --rcfile=.coveragerc -m pytest -m "not ompl and not imports" ../tests
+    - |-
+      echo "This is just the main part's coverage; Additional tests are run in other stages" && \
+      echo "and the complete coverage is checked and displayed in the coverage stage."
+  artifacts:
+    expose_as: 'coverage_base'
+    when: always
+    paths:
+      - ci/coverage/
