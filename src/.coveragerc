@@ -1,0 +1,42 @@
+# .coveragerc to control coverage.py
+# docs: https://coverage.readthedocs.io/en/coverage-5.0.4/config.html
+[run]
+source = base_opt/
+relative_files = True
+branch = True
+data_file = ../ci/coverage/report.coverage
+omit =
+	*/__init__.py
+    # Generated broken file
+	*.cpp
+	*.rendered.*  # cpp files created by cppimport on the fly
+	*.so
+
+[report]
+skip_empty = True
+omit =
+	*/__init__.py
+	*.cpp
+	*.rendered.*  # cpp files created by cppimport on the fly
+	*.so
+
+exclude_lines =
+	# Don't complain about defensive assertion code:
+	raise AsertionError
+	raise NotImplementedError
+	assert
+	pragma: no cover
+
+	# Don't complain if non-runnable code isn't run:
+	if False:
+	if __name__ == ["']__main__["']:
+
+# No fail-under specification, will be specified locally
+
+# Nice html report to access in browser
+[html]
+directory = ../ci/coverage/html
+
+# XML report is needed for gitlab visualization
+[xml]
+output = ../ci/coverage/coverage.xml
