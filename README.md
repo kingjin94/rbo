@@ -14,7 +14,7 @@ Install
 Running the Experiments
 =======================
 
-The experiments are best run inside a docker container. Use the provided docker-compose file to get a shell with all dependencies installed: `docker compose run -i --service-ports rbpo bash`.
+The experiments are best run inside a docker container. Use the provided docker-compose file to get a shell with all dependencies installed: `docker compose run -i --service-ports base-opt bash`.
 Then you can run the experiments with the provided shell scripts in the `experiments` folder.
 We note that the experiments are computationally expensive and require a lot of CPU time and memory (order of 1000 CPU hours).
 The results for the analysis are provided in the [data folder](data).
@@ -23,6 +23,7 @@ Running the Evaluation
 ======================
 
 The evaluations for the paper are provided as a [jupyter notebook](tba).
+These can be run just by installing the requirements, starting jupyter lab `jupyter lab` and running the notebook.
 
 Issue Tracker and Questions
 ===========================

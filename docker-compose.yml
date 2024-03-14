@@ -1,0 +1,15 @@
+services:
+  base-opt:  # based on mcs/docker-compose.yml
+    image: gitlab.lrz.de:5005/tum-cps/robot-base-pose-optimization/ompl:main
+    volumes:
+      - .:$PWD  # Mirror local path
+    ports:
+      - "7000:7000"  # Meshcat visualizer
+      - "7001:7001"
+      - "7002:7002"
+      - "7003:7003"
+      - "7004:7004"
+      - "7005:7005"
+      - "8888:8888"  # Jupyter
+    entrypoint: $PWD/entrypoint_base_opt.sh
+    working_dir: $PWD  # Make sure anything inside starts of in main base-opt folder
