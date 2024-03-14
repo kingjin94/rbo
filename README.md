@@ -16,6 +16,11 @@ Running the Experiments
 
 The experiments are best run inside a docker container. Use the provided docker-compose file to get a shell with all dependencies installed: `docker compose run -i --service-ports base-opt bash`.
 Then you can run the experiments with the provided shell scripts in the `experiments` folder.
+The experiments have two parts:
+
+1. Hyperparameter optimization [run_hyperparameter_optimization.sh](experiments/run_hyperparameter_optimization.sh)
+2. Evaluation of the best hyperparameters [run_evaluation.sh](experiments/run_evaluation.sh)
+
 We note that the experiments are computationally expensive and require a lot of CPU time and memory (order of 1000 CPU hours).
 The results for the analysis are provided in the [data folder](data).
 
