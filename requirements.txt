@@ -1,0 +1,3 @@
+mcs/timor-python/.[full]
+-e mcs/.[full]
+-e .

@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "base-opt"
+description = "Optimizing the base of a (modular reconfigurable) robot"
+authors = [
+  { name = "Matthias Mayer", email = "matthias.mayer@tum.de" }
+]
+classifiers = [
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only"
+]
+keywords = ["Modular Reconfigurable Robots", "Robot Design", "Simulation", "Optimization"]
+dependencies = [
+    "tqdm == 4.62.3",
+    "setuptools",
+    "timor-python>=1.0",
+    "cobra-io>=0.0.3",
+    "mcs>=0.0.1",
+    "jupyterlab",
+    "optuna",
+    "pygad",
+    "scikit-optimize",
+    "pandas",
+    "seaborn",
+    "matplotlib",
+    "plotly"
+]
+requires-python = ">=3.9"
+dynamic = ["version", "readme"]
+
+[project.optional-dependencies]
+dev = ["flake8>=5.0", "coverage>=6.3", "pre-commit", "pip-tools", "pytest>=6.0", "setuptools"]
+
+[tool.setuptools.dynamic]
+readme = {file = "README.md"}
+version = {attr = "base-opt.__version__"}
