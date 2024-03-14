@@ -1,3 +1,11 @@
+"""
+Extended filters used in base optimization.
+
+:author: Matthias Mayer
+:date: 15.12.23
+"""
+
+
 from functools import lru_cache
 from typing import Collection, Tuple, Type
 
@@ -48,7 +56,7 @@ class RobotLongEnoughFilter(GoalByGoalFilter):
 
     def _check_goal(self, assembly: ModuleAssembly, goal: Goals.GoalBase, results: IntermediateFilterResults,
                     task: Task):
-        """Make sure robot length >= distance goal <-> robot placement"""
+        """Make sure robot length >= distance goal <-> robot placement."""
         goal_pose = goal.goal_pose.nominal
         if isinstance(goal_pose, Frame):
             goal_pose = goal_pose.in_world_coordinates()
@@ -56,5 +64,5 @@ class RobotLongEnoughFilter(GoalByGoalFilter):
                 >= np.linalg.norm((results.robot.placement.inv @ goal_pose).translation))
 
     def __repr__(self):
-        """Debug string to identify this filter"""
+        """Debug string to identify this filter."""
         return f"{self.__class__.__name__}"

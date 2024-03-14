@@ -1,3 +1,11 @@
+"""
+Test extended filters used in base optimization.
+
+:author: Matthias Mayer
+:date: 15.12.23
+"""
+
+
 import unittest
 
 from timor import Transformation
