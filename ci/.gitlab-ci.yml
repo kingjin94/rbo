@@ -1,5 +1,7 @@
 variables:
   IMAGE_OMPL_TAG: ${CI_REGISTRY_IMAGE}/ompl:main  # Manually push from mcs's ompl:main image
+  GIT_SUBMODULE_STRATEGY: recursive
+  GIT_SUBMODULE_UPDATE_FLAGS: --remote
 
 default:
   image: ${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/python:3.11
