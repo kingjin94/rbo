@@ -23,7 +23,7 @@ docstring check:
     GIT_SUBMODULE_STRATEGY: none
   script:
     - pip install pydocstyle
-    - cd src/mcs && pydocstyle --match-dir='^((?!demos|\.).)*' --config=../../.pydocstyle
+    - cd src/base_opt && pydocstyle --match-dir='^((?!demos|\.).)*' --config=../../.pydocstyle
 
 flake8 linting:
   stage: static_check
@@ -33,7 +33,7 @@ flake8 linting:
     - python --version
     - pip --version
     - pip install flake8==5.0.4
-    - flake8 --count src/mcs/ tests/
+    - flake8 --count src/base_opt/ tests/
     # Ignore F821 (undefined name) - in these files the undefined names are only used for type hinting and cannot be properly imported (circular imports)
     # Ignore F841 (assigned but never used) for unittests as in some cases this helps clarity of the code when an exception raise is checked
 
@@ -41,10 +41,9 @@ unittests:
   image: $IMAGE_OMPL_TAG
   stage: unittest
   script:
-    - pip install -e timor-python/.[full]
-    - pip install -e .[full]  # Make sure C++ bindings are build in src folder
+    - pip install -r requirements.txt
     - cd src  # Make sure we use local mcs files in import such that coverage can be tracked
-    - coverage run -p --rcfile=.coveragerc -m pytest -m "not ompl and not imports" ../tests
+    - coverage run -p --rcfile=.coveragerc -m pytest ../tests
     - |-
       echo "This is just the main part's coverage; Additional tests are run in other stages" && \
       echo "and the complete coverage is checked and displayed in the coverage stage."
