@@ -3,7 +3,7 @@ requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "base-opt"
+name = "base_opt"
 description = "Optimizing the base of a (modular reconfigurable) robot"
 authors = [
   { name = "Matthias Mayer", email = "matthias.mayer@tum.de" }
@@ -37,4 +37,4 @@ dev = ["flake8>=5.0", "coverage>=6.3", "pre-commit", "pip-tools", "pytest>=6.0",
 
 [tool.setuptools.dynamic]
 readme = {file = "README.md"}
-version = {attr = "base-opt.__version__"}
+version = {attr = "base_opt.__version__"}
