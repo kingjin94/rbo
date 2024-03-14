@@ -29,6 +29,11 @@ Issue Tracker and Questions
 
 Please use the [issue tracker of this repository](https://gitlab.lrz.de/tum-cps/robot-base-pose-optimization/-/issues) to report bugs or ask questions.
 
+Unittests and CI
+================
+
+We use pytest for unittests and gitlab CI for continuous integration.
+
 Contact
 =======
 Matthias Mayer (matthias.mayer@tum.de)
