@@ -1,0 +1,33 @@
+GAOptimizer:
+  best:
+    # Trial 345 (id 2631) in GA400_prune_longer with value -13.52 and success rate 0.929
+    population_size: 25
+    num_generations: 264
+    mutation_probability: 0.26896800963142575
+    num_parents_mating: 14
+    keep_parents: 12
+    crossover_type: single_point
+    keep_elitism: 3
+    save_best_solutions: True
+    save_solutions: True
+
+BOOptimizer:
+  best:
+    # Trial 47 (id 1873) in BO400_pruning_more_time with value -14.237 and success rate 0.843
+    n_jobs: 1
+    acq_func: EI
+    acq_optimizer: sampling
+    ask_strategy: default
+    batch_size: 1  # No other for default
+    initial_point_generator: hammersly
+    n_initial_points: 31
+    acq_func_kwargs:
+      xi: 0.09728621285669029
+
+RandomBaseOptimizer:
+  best:
+    # Empty
+
+DummyOptimizer:
+  best:
+    # Empty

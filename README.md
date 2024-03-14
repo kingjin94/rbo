@@ -34,6 +34,7 @@ Unittests and CI
 ================
 
 We use pytest for unittests and gitlab CI for continuous integration.
+The used docker image can be locally built with `ci/build_docker.sh`.
 
 Contact
 =======

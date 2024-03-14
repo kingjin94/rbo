@@ -28,7 +28,7 @@ from mcs.utilities.default_robots import get_six_axis_modrob_v2
 
 from base_opt.base_opt import config
 from base_opt.utilities import Proxies
-from base_opt.utilities.AsssemblyFilter import RobotLongEnoughFilter
+from base_opt.utilities.AssemblyFilter import RobotLongEnoughFilter
 
 
 class BaseChangeEnvironmentTests(unittest.TestCase):

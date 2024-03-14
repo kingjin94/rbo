@@ -16,7 +16,7 @@ from timor.utilities.prebuilt_robots import get_six_axis_assembly
 from timor.utilities.spatial import random_rotation
 from timor.utilities.tolerated_pose import ToleratedPose
 
-from base_opt.utilities.AsssemblyFilter import RobotLongEnoughFilter
+from base_opt.utilities.AssemblyFilter import RobotLongEnoughFilter
 
 
 class TestAssemblyFilter(unittest.TestCase):

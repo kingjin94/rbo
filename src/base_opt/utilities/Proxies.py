@@ -4,6 +4,7 @@ import gymnasium as gym
 import numpy as np
 from scipy.spatial.transform import Rotation
 
+from mcs.TaskSolver import TaskSolverBase
 from mcs.environments.Proxies import FixedPenaltyTaskSolverAssemblyEvaluationEnvironment
 from timor import ModuleAssembly, Transformation
 from timor.task import Constraints
@@ -95,7 +96,7 @@ class BaseChangeEnvironment(FixedPenaltyTaskSolverAssemblyEvaluationEnvironment)
 
     def __init__(self,
                  assembly: ModuleAssembly,
-                 task_solver: 'TaskSolverBase',
+                 task_solver: TaskSolverBase,
                  cost_function: CostFunctionBase,
                  task: Optional[Task] = None,
                  render_mode: str = 'human',
