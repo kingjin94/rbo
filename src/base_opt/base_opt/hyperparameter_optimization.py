@@ -71,9 +71,9 @@ def evaluate_n_algorithm_hps(study: optuna.study,
 
 
 def hp_tune(algorithm: str, n_trials: int, parallel_trials: int, storage: str, sampler: str, pruner: str,
-            study_name: str, seed: int, device: str, timeout: float, reward_fail: float, penalty_ik_distance: float,
-            penalty_filter_fails: float, train_set: str, eval_set: str, observations: List[str], action_space: str,
-            optimize_hyperparameters: bool, rl_algorithm: str, reward_improvement: bool, additional_args: List[str]):
+            study_name: str, seed: int, timeout: float, reward_fail: float, penalty_ik_distance: float,
+            penalty_filter_fails: float, eval_set: str, action_space: str, optimize_hyperparameters: bool,
+            additional_args: List[str]):
     """Run hyperparameter optimization for a single algorithm."""
     t0 = time()
 
@@ -99,19 +99,14 @@ def hp_tune(algorithm: str, n_trials: int, parallel_trials: int, storage: str, s
         study.set_user_attr('reward_fail', reward_fail)
         study.set_user_attr('penalty_ik_distance', penalty_ik_distance)
         study.set_user_attr('penalty_filter_fails', penalty_filter_fails)
-        study.set_user_attr('train_set', train_set)
         study.set_user_attr('eval_set', eval_set)
-        study.set_user_attr('observations', observations)
         study.set_user_attr('action_space', action_space)
-        study.set_user_attr('rl_algorithm', rl_algorithm)
         study.set_user_attr('additional_args', additional_args)
 
     if len(additional_args) > 0:
         logging.warning(f"Additional arguments {additional_args} are ignored for {algorithm}.")
     optimizer_class = str_to_base_optimizer[algorithm]
     optimizer_search_space = algorithm_to_search_space[algorithm]
-    if train_set is not None:
-        logging.warning(f"Train set {train_set} is ignored for {algorithm}.")
     os.environ['OMP_NUM_THREADS'] = '4'  # Limit numpy to sensible number of threads
     if parallel_trials > 1:
         with Pool(parallel_trials) as pool:
@@ -172,9 +167,9 @@ def main(*args):
 
     # Run hyperparameter optimization
     hp_tune(args.algorithm, args.n_trials, args.parallel_trials, args.storage,
-            args.sampler, args.pruner, args.study_name, args.seed, args.device, args.timeout, args.reward_fail,
-            args.penalty_ik_distance, args.penalty_filter_fails, args.train_set, args.eval_set, args.observations,
-            args.action_space, args.optimize_hyperparameters, args.rl_algorithm, args.reward_improvement,
+            args.sampler, args.pruner, args.study_name, args.seed, args.timeout, args.reward_fail,
+            args.penalty_ik_distance, args.penalty_filter_fails, args.eval_set,
+            args.action_space, args.optimize_hyperparameters,
             additional_args)
 
 

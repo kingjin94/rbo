@@ -1,10 +1,8 @@
 import argparse
 from argparse import ArgumentParser
-import os
 from pathlib import Path
 import tempfile
 
-import cobra
 import numpy as np
 import optuna
 import yaml
@@ -35,15 +33,17 @@ ASSEMBLY = assemblies['modrob-gen2']
 
 
 # Configure Task Files and Task Generators
-EVAL_TASK_FILES = [cobra.task.get_task(id=f'Whitman2020/with_torque/variable_base_xyz_any_rot/3g_3o/{i}')
+EVAL_TASK_FILES = [Path(f'data/cobra_cache/tasks/2022/Whitman2020/with_torque/variable_base_xyz_any_rot/3g_3o/{i}.json')
                    for i in range(70)]
 EVAL_MIN_FILES = EVAL_TASK_FILES[5:8]  # Small subset for testing and debugging; 6 easy to solve
-TEST_SIMPLE_TASK_FILES = [cobra.task.get_task(id=f'Whitman2020/with_torque/variable_base_xyz_any_rot/3g_3o/{i}')
-                          for i in range(70, 100)]
-TEST_HARD_TASK_FILES = [cobra.task.get_task(id=f'Whitman2020/with_torque/variable_base_xyz_any_rot/5g_5o/{i}')
-                        for i in range(100)]
-realworld_tasks, _ = cobra.task.find_tasks(id_contains="Liu2020/Case2b/variable_base_xyz_any_rot")
-TEST_REALWORLD_TASK_FILES = [cobra.task.get_task(uuid=uuid) for uuid in realworld_tasks]
+TEST_SIMPLE_TASK_FILES = \
+    [Path(f'data/cobra_cache/tasks/2022/Whitman2020/with_torque/variable_base_xyz_any_rot/3g_3o/{i}.json')
+     for i in range(70, 100)]
+TEST_HARD_TASK_FILES = \
+    [Path(f'data/cobra_cache/tasks/2022/Whitman2020/with_torque/variable_base_xyz_any_rot/5g_5o/{i}.json')
+     for i in range(100)]
+TEST_REALWORLD_TASK_FILES = \
+    [p for p in Path('data/cobra_cache/tasks/2022/').rglob('Liu2020/Case2b/variable_base_xyz_any_rot/*.json')]
 
 EVAL_TASK_GENERATOR = FixedSetTaskGenerator(
     rng=RNG,
@@ -140,16 +140,9 @@ def set_seed(seed: int):
     RNG = np.random.default_rng(seed)
 
 
-def set_device(device: str):
-    """Set device for torch."""
-    if device != 'cuda':
-        os.environ["CUDA_VISIBLE_DEVICES"] = ""  # Disable GPU
-
-
 def adapt_config(args):
     """Adapt config to arguments."""
     set_seed(args.seed)
-    set_device(args.device)
     global ASSEMBLY
     ASSEMBLY = assemblies[args.assembly]
     global TASK_SOLVER_TIMEOUT
@@ -181,8 +174,6 @@ def add_default_arguments(parser: ArgumentParser):
     parser.add_argument("--reward-fail", type=float,
                         help='Timeout for optimizing a single task´s base pose',
                         default=REWARD_FAIL)
-    parser.add_argument("--device", type=str, help='Device to use for training', default="cpu",
-                        choices=['cpu', 'cuda'])
     parser.add_argument("--assembly", type=str, help='Assembly to use', choices=assemblies.keys(),
                         default="modrob-gen2")
     parser.add_argument("--action-space", type=str, help='Action space to use',
