@@ -33,17 +33,21 @@ ASSEMBLY = assemblies['modrob-gen2']
 
 
 # Configure Task Files and Task Generators
-EVAL_TASK_FILES = [Path(f'data/cobra_cache/tasks/2022/Whitman2020/with_torque/variable_base_xyz_any_rot/3g_3o/{i}.json')
-                   for i in range(70)]
+BASE_OPT_SRC = Path(__file__).parent.parent
+BASE_OPT_ROOT = BASE_OPT_SRC.parent.parent
+EVAL_TASK_FILES = [BASE_OPT_ROOT.joinpath(
+    f'data/cobra_cache/tasks/2022/Whitman2020/with_torque/variable_base_xyz_any_rot/3g_3o/{i}.json')
+    for i in range(70)]
 EVAL_MIN_FILES = EVAL_TASK_FILES[5:8]  # Small subset for testing and debugging; 6 easy to solve
-TEST_SIMPLE_TASK_FILES = \
-    [Path(f'data/cobra_cache/tasks/2022/Whitman2020/with_torque/variable_base_xyz_any_rot/3g_3o/{i}.json')
-     for i in range(70, 100)]
-TEST_HARD_TASK_FILES = \
-    [Path(f'data/cobra_cache/tasks/2022/Whitman2020/with_torque/variable_base_xyz_any_rot/5g_5o/{i}.json')
-     for i in range(100)]
+TEST_SIMPLE_TASK_FILES = [BASE_OPT_ROOT.joinpath(
+    f'data/cobra_cache/tasks/2022/Whitman2020/with_torque/variable_base_xyz_any_rot/3g_3o/{i}.json')
+    for i in range(70, 100)]
+TEST_HARD_TASK_FILES = [BASE_OPT_ROOT.joinpath(
+    f'data/cobra_cache/tasks/2022/Whitman2020/with_torque/variable_base_xyz_any_rot/5g_5o/{i}.json')
+    for i in range(100)]
 TEST_REALWORLD_TASK_FILES = \
-    [p for p in Path('data/cobra_cache/tasks/2022/').rglob('Liu2020/Case2b/variable_base_xyz_any_rot/*.json')]
+    [p for p in
+     BASE_OPT_ROOT.joinpath('data/cobra_cache/tasks/2022/').rglob('Liu2020/Case2b/variable_base_xyz_any_rot/*.json')]
 
 EVAL_TASK_GENERATOR = FixedSetTaskGenerator(
     rng=RNG,
