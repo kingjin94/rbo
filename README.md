@@ -18,11 +18,14 @@ The experiments are best run inside a docker container. Use the provided docker-
 Then you can run the experiments with the provided shell scripts in the `experiments` folder.
 The experiments have two parts:
 
-1. Hyperparameter optimization [run_hyperparameter_optimization.sh](experiments/run_hyperparameter_optimization.sh)
+1. Hyperparameter optimization [run_hyperparameter_optimization.sh](experiments/run_hyperparameter_optimization.sh).
+The optuna database for our training is given in [data/optuna.db](data/optuna.db).
+It can be viewed, e.g., with the optuna dashboard: `optuna-dashboard --port 6006 sqlite:///data/optuna.db`.
 2. Evaluation of the best hyperparameters [run_evaluation.sh](experiments/run_evaluation.sh)
 
-We note that the experiments are computationally expensive and require a lot of CPU time and memory (order of 1000 CPU hours).
-The results for the analysis are provided in the [data folder](data).
+We note that the experiments are computationally expensive and require a lot of CPU time and memory (order of 1000s CPU hours).
+We suggest running the evaluation with [GNU parallel](https://www.gnu.org/software/parallel/) over task sets/action spaces/seed/algorithm combinations as done in [run_evaluation.sh](experiments/run_evaluation.sh).
+The results for the analysis are provided in the [data/outdir_test_1200 folder](data).
 
 Running the Evaluation
 ======================
