@@ -1,3 +1,4 @@
 mcs/timor-python/.[full]
+-e cobra-io/.
 -e mcs/.[full]
 -e .

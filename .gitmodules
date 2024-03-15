@@ -2,3 +2,7 @@
 	path = mcs
 	url = ../mcs.git
 	branch = dev/base_opt
+[submodule "cobra-io"]
+	path = cobra-io
+	url = ../cobra-io.git
+	branch = dev/base_opt
