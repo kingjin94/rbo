@@ -3,3 +3,5 @@ src/base_opt.egg-info/**
 **/__pycache__/**
 # Just symlinks:
 data/cobra_cache/tasks/2022/assets/*
+data/outdir_test_1200/*
+**/.ipynb_checkpoints/**
