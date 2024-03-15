@@ -1,3 +1,4 @@
 [submodule "mcs"]
 	path = mcs
 	url = ../mcs.git
+	branch = dev/base_opt
