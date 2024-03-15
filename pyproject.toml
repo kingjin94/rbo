@@ -21,13 +21,15 @@ dependencies = [
     "cobra-io>=0.0.3",
     "mcs>=0.0.1",
     "jupyterlab",
+    "notebook",
     "optuna",
     "pygad",
     "scikit-optimize",
     "pandas",
     "seaborn",
     "matplotlib",
-    "plotly"
+    "plotly",
+    "SciencePlots"
 ]
 requires-python = ">=3.9"
 dynamic = ["version", "readme"]
