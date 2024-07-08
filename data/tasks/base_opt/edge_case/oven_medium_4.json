@@ -1,0 +1,331 @@
+{
+  "header": {
+    "ID": "base_opt/edge_case/oven_medium_4",
+    "version": "2023",
+    "taskName": "",
+    "tags": [
+      "BPO25",
+      "base pose optimization 2025",
+      "Any base rotation",
+      "edge_case",
+      "oven",
+      "medium",
+      "3 goals"
+    ],
+    "date": "2024-07-08",
+    "timeStepSize": 0.01,
+    "gravity": [ 0.0, 0.0, -9.81 ],
+    "author": [
+      "Friedrich Dang",
+      "Matthias Mayer"
+    ],
+    "email": [
+      "friedrich.dang@tum.de",
+      "matthias.mayer@tum.de"
+    ],
+    "affiliation": [
+      "Technical University of Munich",
+      "Technical University of Munich"
+    ]
+  },
+  "constraints": [
+    {
+      "type": "joint",
+      "parts": [
+        "q",
+        "dq",
+        "tau"
+      ]
+    },
+    {
+      "type": "collisionFree"
+    },
+    {
+      "type": "allGoalsFulfilled"
+    },
+    {
+      "type": "basePlacement",
+      "pose": {
+        "nominal": [
+          [ 1.0, 0.0, 0.0, 0.0 ],
+          [ 0.0, 1.0, 0.0, 0.0 ],
+          [ 0.0, 0.0, 1.0, 0.0 ],
+          [ 0.0, 0.0, 0.0, 1.0 ]
+        ],
+        "toleranceProjection": [
+          "x",
+          "y",
+          "z"
+        ],
+        "tolerance": [
+          [ -1, 1 ],
+          [ -1, 1 ],
+          [ -1, 1 ]
+        ],
+        "frame": [
+          "nominal",
+          "nominal",
+          "nominal"
+        ]
+      }
+    }
+  ],
+  "obstacles": [
+    {
+      "ID": "Obstacle 0",
+      "name": null,
+      "collision": [
+        {
+          "type": "box",
+          "parameters": {
+            "x": 0.25,
+            "y": 0.25,
+            "z": 0.25
+          },
+          "pose": [
+            [ 1.0, 0.0, 0.0, -1.25 ],
+            [ 0.0, 1.0, 0.0, 0.0 ],
+            [ 0.0, 0.0, 1.0, -0.5 ],
+            [ 0.0, 0.0, 0.0, 1.0 ]
+          ]
+        }
+      ]
+    },
+    {
+      "ID": "Obstacle 1",
+      "name": null,
+      "collision": [
+        {
+          "type": "box",
+          "parameters": {
+            "x": 0.25,
+            "y": 0.25,
+            "z": 0.25
+          },
+          "pose": [
+            [ 1.0, 0.0, 0.0, -1.5 ],
+            [ 0.0, 1.0, 0.0, 0.0 ],
+            [ 0.0, 0.0, 1.0, -0.5 ],
+            [ 0.0, 0.0, 0.0, 1.0 ]
+          ]
+        }
+      ]
+    },
+    {
+      "ID": "Obstacle 2",
+      "name": null,
+      "collision": [
+        {
+          "type": "box",
+          "parameters": {
+            "x": 0.25,
+            "y": 0.25,
+            "z": 0.25
+          },
+          "pose": [
+            [ 1.0, 0.0, 0.0, -1.5 ],
+            [ 0.0, 1.0, 0.0, 0.0 ],
+            [ 0.0, 0.0, 1.0, -0.25 ],
+            [ 0.0, 0.0, 0.0, 1.0 ]
+          ]
+        }
+      ]
+    },
+    {
+      "ID": "Obstacle 3",
+      "name": null,
+      "collision": [
+        {
+          "type": "box",
+          "parameters": {
+            "x": 0.25,
+            "y": 0.25,
+            "z": 0.25
+          },
+          "pose": [
+            [ 1.0, 0.0, 0.0, -1.25 ],
+            [ 0.0, 1.0, 0.0, 0.0 ],
+            [ 0.0, 0.0, 1.0, -0.25 ],
+            [ 0.0, 0.0, 0.0, 1.0 ]
+          ]
+        }
+      ]
+    },
+    {
+      "ID": "Obstacle 4",
+      "name": null,
+      "collision": [
+        {
+          "type": "box",
+          "parameters": {
+            "x": 0.25,
+            "y": 0.25,
+            "z": 0.25
+          },
+          "pose": [
+            [ 1.0, 0.0, 0.0, -1.25 ],
+            [ 0.0, 1.0, 0.0, 0.0 ],
+            [ 0.0, 0.0, 1.0, -0.75 ],
+            [ 0.0, 0.0, 0.0, 1.0 ]
+          ]
+        }
+      ]
+    },
+    {
+      "ID": "Obstacle 5",
+      "name": null,
+      "collision": [
+        {
+          "type": "box",
+          "parameters": {
+            "x": 0.25,
+            "y": 0.25,
+            "z": 0.25
+          },
+          "pose": [
+            [ 1.0, 0.0, 0.0, -1.5 ],
+            [ 0.0, 1.0, 0.0, -0.25 ],
+            [ 0.0, 0.0, 1.0, -0.5 ],
+            [ 0.0, 0.0, 0.0, 1.0 ]
+          ]
+        }
+      ]
+    },
+    {
+      "ID": "Obstacle 6",
+      "name": null,
+      "collision": [
+        {
+          "type": "box",
+          "parameters": {
+            "x": 0.25,
+            "y": 0.25,
+            "z": 0.25
+          },
+          "pose": [
+            [ 1.0, 0.0, 0.0, -1.5 ],
+            [ 0.0, 1.0, 0.0, -0.25 ],
+            [ 0.0, 0.0, 1.0, -0.25 ],
+            [ 0.0, 0.0, 0.0, 1.0 ]
+          ]
+        }
+      ]
+    },
+    {
+      "ID": "Obstacle 7",
+      "name": null,
+      "collision": [
+        {
+          "type": "box",
+          "parameters": {
+            "x": 0.25,
+            "y": 0.25,
+            "z": 0.25
+          },
+          "pose": [
+            [ 1.0, 0.0, 0.0, -1.5 ],
+            [ 0.0, 1.0, 0.0, -0.25 ],
+            [ 0.0, 0.0, 1.0, -0.75 ],
+            [ 0.0, 0.0, 0.0, 1.0 ]
+          ]
+        }
+      ]
+    }
+  ],
+  "goals": [
+    {
+      "ID": "Goal 0",
+      "type": "reach",
+      "constraints": [],
+      "goalPose": {
+        "nominal": [
+          [ 0.0, 0.0, 1.0, 0.25 ],
+          [ 0.0, 1.0, 0.0, -1.5 ],
+          [ -1.0, 0.0, 0.0, -0.75 ],
+          [ 0.0, 0.0, 0.0, 1.0 ]
+        ],
+        "toleranceProjection": [
+          "x",
+          "y",
+          "z",
+          "Theta_R"
+        ],
+        "tolerance": [
+          [ -0.001, 0.001 ],
+          [ -0.001, 0.001 ],
+          [ -0.001, 0.001 ],
+          [ 0.0, 0.008726646259971648 ]
+        ],
+        "toleranceFrame": [
+          "nominal",
+          "nominal",
+          "nominal",
+          "nominal"
+        ]
+      }
+    },
+    {
+      "ID": "Goal 1",
+      "type": "reach",
+      "constraints": [],
+      "goalPose": {
+        "nominal": [
+          [ 0.0, 0.0, 1.0, -0.75 ],
+          [ 0.0, 1.0, 0.0, 0.0 ],
+          [ -1.0, 0.0, 0.0, -0.75 ],
+          [ 0.0, 0.0, 0.0, 1.0 ]
+        ],
+        "toleranceProjection": [
+          "x",
+          "y",
+          "z",
+          "Theta_R"
+        ],
+        "tolerance": [
+          [ -0.001, 0.001 ],
+          [ -0.001, 0.001 ],
+          [ -0.001, 0.001 ],
+          [ 0.0, 0.008726646259971648 ]
+        ],
+        "toleranceFrame": [
+          "nominal",
+          "nominal",
+          "nominal",
+          "nominal"
+        ]
+      }
+    },
+    {
+      "ID": "Goal 2",
+      "type": "reach",
+      "constraints": [],
+      "goalPose": {
+        "nominal": [
+          [ 0.0, 0.0, 1.0, -1.5 ],
+          [ 0.0, 1.0, 0.0, 0.0 ],
+          [ -1.0, 0.0, 0.0, -0.75 ],
+          [ 0.0, 0.0, 0.0, 1.0 ]
+        ],
+        "toleranceProjection": [
+          "x",
+          "y",
+          "z",
+          "Theta_R"
+        ],
+        "tolerance": [
+          [ -0.001, 0.001 ],
+          [ -0.001, 0.001 ],
+          [ -0.001, 0.001 ],
+          [ 0.0, 0.008726646259971648 ]
+        ],
+        "toleranceFrame": [
+          "nominal",
+          "nominal",
+          "nominal",
+          "nominal"
+        ]
+      }
+    }
+  ],
+  "frames": {}
+}

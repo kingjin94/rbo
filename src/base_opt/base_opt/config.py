@@ -7,6 +7,7 @@ import numpy as np
 import optuna
 import yaml
 
+from base_opt.utilities.file_locations import DATA
 from mcs.TaskSolver import SimpleHierarchicalTaskSolverWithoutBaseChange, TaskSolverBase
 from mcs.utilities.default_robots import get_six_axis_modrob_v2
 from timor.configuration_search.AssemblyFilter import AssemblyModuleLengthFilter, InverseKinematicsSolvable, \
@@ -33,21 +34,20 @@ ASSEMBLY = assemblies['modrob-gen2']
 
 
 # Configure Task Files and Task Generators
-BASE_OPT_SRC = Path(__file__).parent.parent
-BASE_OPT_ROOT = BASE_OPT_SRC.parent.parent
-EVAL_TASK_FILES = [BASE_OPT_ROOT.joinpath(
-    f'data/cobra_cache/tasks/2022/Whitman2020/with_torque/variable_base_xyz_any_rot/3g_3o/{i}.json')
+EVAL_TASK_FILES = [DATA.joinpath(
+    f'cobra_cache/tasks/2022/Whitman2020/with_torque/variable_base_xyz_any_rot/3g_3o/{i}.json')
     for i in range(70)]
 EVAL_MIN_FILES = EVAL_TASK_FILES[5:8]  # Small subset for testing and debugging; 6 easy to solve
-TEST_SIMPLE_TASK_FILES = [BASE_OPT_ROOT.joinpath(
-    f'data/cobra_cache/tasks/2022/Whitman2020/with_torque/variable_base_xyz_any_rot/3g_3o/{i}.json')
+TEST_SIMPLE_TASK_FILES = [DATA.joinpath(
+    f'cobra_cache/tasks/2022/Whitman2020/with_torque/variable_base_xyz_any_rot/3g_3o/{i}.json')
     for i in range(70, 100)]
-TEST_HARD_TASK_FILES = [BASE_OPT_ROOT.joinpath(
-    f'data/cobra_cache/tasks/2022/Whitman2020/with_torque/variable_base_xyz_any_rot/5g_5o/{i}.json')
+TEST_HARD_TASK_FILES = [DATA.joinpath(
+    f'cobra_cache/tasks/2022/Whitman2020/with_torque/variable_base_xyz_any_rot/5g_5o/{i}.json')
     for i in range(100)]
 TEST_REALWORLD_TASK_FILES = \
     [p for p in
-     BASE_OPT_ROOT.joinpath('data/cobra_cache/tasks/2022/').rglob('Liu2020/Case2b/variable_base_xyz_any_rot/*.json')]
+     DATA.joinpath('cobra_cache/tasks/2022/').rglob('Liu2020/Case2b/variable_base_xyz_any_rot/*.json')]
+TEST_EDGE_CASE_TASK_FILES = [p for p in DATA.joinpath("tasks/base_opt/edge_case").glob("*.json")]
 
 EVAL_TASK_GENERATOR = FixedSetTaskGenerator(
     rng=RNG,
@@ -64,6 +64,9 @@ TEST_HARD_TASK_GENERATOR = FixedSetTaskGenerator(
 TEST_REALWORLD_TASK_GENERATOR = FixedSetTaskGenerator(
     rng=RNG,
     tasks=[Task.from_json_file(f) for f in TEST_REALWORLD_TASK_FILES])
+TEST_EDGE_CASE_TASK_GENERATOR = FixedSetTaskGenerator(
+    rng=RNG,
+    tasks=[Task.from_json_file(f) for f in TEST_EDGE_CASE_TASK_FILES])
 
 
 str_to_task_set = {
@@ -72,6 +75,7 @@ str_to_task_set = {
     "test_simple": TEST_SIMPLE_TASK_GENERATOR,
     "test_hard": TEST_HARD_TASK_GENERATOR,
     "test_realworld": TEST_REALWORLD_TASK_GENERATOR,
+    "test_edge_case": TEST_EDGE_CASE_TASK_GENERATOR,
 }
 
 
