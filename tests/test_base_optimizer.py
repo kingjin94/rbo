@@ -33,7 +33,7 @@ from timor.utilities.tolerated_pose import ToleratedPose
 
 from base_opt.base_opt import config, evaluate_algorithm, hyperparameter_optimization
 from base_opt.base_opt.BaseOptimizer import BOOptimizer, BaseOptimizationHistory, BaseOptimizerBase, DummyOptimizer, \
-    GAOptimizer, RandomBaseOptimizer, RandomGrid
+    GAOptimizer, GreedyOptimizer, RandomBaseOptimizer, RandomGrid
 from base_opt.utilities.Proxies import BaseChangeEnvironment
 
 
@@ -146,6 +146,10 @@ class TestBaseOptimizer(unittest.TestCase):
     def test_dummy_optimizer(self):
         """Test that the dummy optimizer works on a simple task and environment."""
         self._test_optimizer(DummyOptimizer)
+
+    def test_greedy_optimizer(self):
+        """Test that the greedy optimizer works on a simple task and environment."""
+        self._test_optimizer(GreedyOptimizer)
 
     def test_grid_optimizer(self):
         """Test that the grid optimizer works and keeps to grid on a simple task and environment."""

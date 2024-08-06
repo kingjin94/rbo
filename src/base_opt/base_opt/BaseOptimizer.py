@@ -10,6 +10,7 @@ import uuid
 import numpy as np
 import pandas as pd
 from pygad import pygad
+import scipy.optimize
 import skopt
 
 from mcs.optimize.Sampler import GridSampler
@@ -299,6 +300,47 @@ class RandomBaseOptimizer(BaseOptimizerBase):
             self._evaluate(action)
 
 
+class GreedyOptimizer(RandomBaseOptimizer):
+    """Greedy optimizer that follows the gradient towards the best robot base pose"""
+
+    @property
+    def specs(self) -> Dict:
+        """Return a dictionary with the specs of the optimizer."""
+        return {"alg": "GreedyOptimizer"}  # TODO: Add hyperparameters such as greedy/restart trade-off
+
+    def _next_action(self, env: BaseChangeEnvironment) -> np.ndarray:
+        """Return the next action to take."""
+        guess = env.action_space.sample()
+        guess_base = env.action2base_pose(guess)
+        env.task_solver.robot.set_base_placement(guess_base)
+        q_closest = {g.id: env.task_solver.robot.ik(g.goal_pose) for g in env.task.goals}
+        if all(ik_res[1] for ik_res in q_closest.values()):  # Short circuit if all goals are already solved
+            return guess
+        T_closest = {g_id: guess_base.inv @ env.task_solver.robot.fk(q) for g_id, (q, _) in q_closest.items()}
+
+        def evaluate_candidate(a) -> float:
+            """
+            Calculate average distance to goal if action a instead of guess is taken to move the base
+
+            with same IK solutions. Overall should be rather cheap as no kinematic calculations included.
+            """
+            base = env.action2base_pose(a)
+            new_eef = {g_id: base @ T for g_id, T in T_closest.items()}
+            delta = {g_id: env.task.goals_by_id[g_id].goal_pose.nominal.in_world_coordinates().distance(eef)
+                     for g_id, eef in new_eef.items()}
+            # TODO Add IK step(s)? - way more expensive...
+            return np.mean([(0. if env.task.goals_by_id[g_id].goal_pose.valid(new_eef[g_id])
+                             else delta[g_id].translation_euclidean) for g_id in delta])
+
+        refined_guess = scipy.optimize.minimize(
+            evaluate_candidate, guess,
+            bounds=[(mini, maxi) for mini, maxi in zip(env.action_space.low, env.action_space.high)]
+        )
+        assert evaluate_candidate(refined_guess.x) < evaluate_candidate(guess), \
+            f"Refined guess {refined_guess.x} is not better than initial guess {guess}"
+        return refined_guess.x
+
+
 class DummyOptimizer(RandomBaseOptimizer):
     """Always return central action."""
 
@@ -438,4 +480,5 @@ str_to_base_optimizer = {
     "RandomGrid": RandomGrid,
     "GAOptimizer": GAOptimizer,
     "BOOptimizer": BOOptimizer,
+    "GreedyOptimizer": GreedyOptimizer
 }
