@@ -19,7 +19,7 @@ import pandas as pd
 import cobra.task.task
 
 from mcs.PathPlanner import PathPlanningFailedException
-from mcs.TaskSolver import SimpleHierarchicalTaskSolver
+from mcs.TaskSolver import SimpleHierarchicalTaskSolverWithoutBaseChange
 from mcs.utilities.default_robots import get_six_axis_modrob_v2
 from mcs.utilities.trajectory import TrajectoryGenerationError
 
@@ -101,7 +101,7 @@ class TestBaseOptimizer(unittest.TestCase):
             Tolerance.CartesianXYZ((-.1, .1), (-.1, .1), (-.1, .1))  # Not too far away from the original base
         )))
         self.task.constraints = new_constraints
-        self.task_solver = SimpleHierarchicalTaskSolver(
+        self.task_solver = SimpleHierarchicalTaskSolverWithoutBaseChange(
             self.task, assembly=self.assembly, filters=default_filters(self.task), timeout=1.)
         self.single_step_env = BaseChangeEnvironment(self.assembly, self.task_solver,
                                                      CostFunctions.CycleTime(),
@@ -150,6 +150,25 @@ class TestBaseOptimizer(unittest.TestCase):
     def test_greedy_optimizer(self):
         """Test that the greedy optimizer works on a simple task and environment."""
         self._test_optimizer(GreedyOptimizer)
+
+    def test_greedy_optimizer_improves_action(self):
+        """Test whether greed optimizer improves a really poor action in big search space."""
+        self.task.base_constraint.tolerance._a *= 10
+        self.task.base_constraint.tolerance._b *= 10
+        self.task.base_constraint.tolerance._c *= 10
+        action = np.array([1., 1., 1.])  # far away from nominal
+        new_action = GreedyOptimizer({})._improve_guess(self.single_step_env, action)
+        self.assertTrue(np.any(new_action != action))
+        result_old = [self.single_step_env.step(action) for _ in range(10)]
+        self.assertTrue(self.assembly.robot.placement == self.single_step_env.action2base_pose(action))
+        result_new = [self.single_step_env.step(new_action) for _ in range(10)]
+        self.assertTrue(self.assembly.robot.placement == self.single_step_env.action2base_pose(new_action))
+        self.assertGreater(np.mean([r[1] for r in result_new]), np.mean([r[1] for r in result_old]),
+                           "Greedy optimizer did not improve action rewards")
+
+        self.task.base_constraint.tolerance._a /= 10
+        self.task.base_constraint.tolerance._b /= 10
+        self.task.base_constraint.tolerance._c /= 10
 
     def test_grid_optimizer(self):
         """Test that the grid optimizer works and keeps to grid on a simple task and environment."""
