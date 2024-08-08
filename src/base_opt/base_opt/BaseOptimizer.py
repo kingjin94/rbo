@@ -410,24 +410,27 @@ class AdamOptimizer(GradientOptimizer):
     :cite: https://arxiv.org/abs/1412.6980
     """
 
-    def __init__(self, hp: Dict, solution_storage: Optional[Path] = None):
+    best_hps = config.known_hyperparameters["AdamOptimizer"]["best"]
+
+    def __init__(self, hp: Dict, solution_storage: Optional[Path] = None,
+                 dtype: torch.dtype = torch.float32):
         """Initialize with learning rate (and dtype) for the adam optimizer."""
-        super().__init__(hp, solution_storage)
-        self._lr = hp.get("lr", 0.2)  # Gradient rather clear - no need for small learning rate
-        self._beta1 = hp.get("beta1", 0.9)  # Current pytorch default
-        self._beta2 = hp.get("beta2", 0.999)
-        self._dtype = hp.get("dtype", torch.float32)
+        self.hp = deepcopy(self.best_hps)
+        super().__init__(self.hp, solution_storage)
+        self.hp.update(hp)
+        self._dtype = dtype
 
     @property
     def specs(self) -> Dict:
         """Return a dictionary with the specs of the optimizer."""
         ret = super().specs
-        ret.update({"alg": "AdamOptimizer", "lr": self._lr, "beta1": self._beta1, "beta2": self._beta2})
+        ret.update({"alg": "AdamOptimizer", **self.hp})
         return ret
 
     def _reset_next_action(self, env: BaseChangeEnvironment):
         self._param = torch.tensor(env.action_space.sample(), requires_grad=True)
-        self._opt = torch.optim.Adam([self._param, ], lr=self._lr, betas=(self._beta1, self._beta2))
+        self._opt = torch.optim.Adam(
+            [self._param, ], lr=self.hp["lr"], betas=(self.hp["beta1"], self.hp["beta2"]))
 
     def _take_local_step(self, env, T_closest: Dict[str, Transformation],
                          guess: np.ndarray) -> np.ndarray:

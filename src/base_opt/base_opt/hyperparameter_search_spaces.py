@@ -50,8 +50,8 @@ def sample_adam_params(trial: optuna.Trial) -> Dict[str, Any]:
         # Betas are in [0, 1) and usually close to 1
         'beta1': 1. - trial.suggest_float('beta1', 1e-5, 1.0, log=True),
         'beta2': 1. - trial.suggest_float('beta2', 1e-5, 1.0, log=True),
-        'local_ik_iter': trial.suggest_int('local_ik_iter', 1, 1000),
-        'local_opt_steps': trial.suggest_int('local_opt_steps', 1, 1000),
+        'local_ik_iter': trial.suggest_int('local_ik_iter', 1, 1000, log=True),
+        'local_opt_steps': trial.suggest_int('local_opt_steps', 1, 1000, log=True),
     }
 
 

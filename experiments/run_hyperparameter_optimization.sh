@@ -16,3 +16,11 @@ python src/base_opt/base_opt/hyperparameter_optimization.py \
   --storage sqlite:///data/optuna.db \
   --algorithm BOOptimizer \
   --study-name BOopimization -optimize
+
+python src/base_opt/base_opt/hyperparameter_optimization.py \
+  --eval-set eval \
+  --n-trials 400 \
+  --parallel-trials 10 \
+  --storage sqlite:///data/optuna.db \
+  --algorithm AdamOptimizer \
+  --study-name Adamopimization -optimize
