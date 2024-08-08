@@ -159,12 +159,14 @@ class TestBaseOptimizer(unittest.TestCase):
         opt = AdamOptimizer(dict(local_search_steps=10, lr=.2, local_ik_steps=100))
         result_new = []
         result_old = []
+        optimized_actions = []
         local_opt_time = 0
         for i in range(num_pts):
             action = np.array((i % 2, (i // 2) % 2, i // 4)) * 2. - 1.  # Edge of action space
             opt._reset_next_action(self.single_step_env)
             t0 = process_time()
             new_action = opt._improve_guess(self.single_step_env, action)
+            optimized_actions.append(new_action)
             local_opt_time += process_time() - t0
             # self.assertTrue(np.any(new_action != action))
             result_old += [self.single_step_env.step(action) for _ in range(10)]
@@ -178,6 +180,9 @@ class TestBaseOptimizer(unittest.TestCase):
                            np.mean([r[1] for r in result_old]),
                            "Greedy optimizer did not improve reward")
         print(f"Local optimization took {local_opt_time / num_pts} seconds per try.")
+        print("Optimized actions mean+/-std: "
+              f"{np.mean(optimized_actions, axis=0)} +/- {np.std(optimized_actions, axis=0)}")
+        print(f"Optimized actions: {optimized_actions}")
         self.task.base_constraint.tolerance._a /= 10
         self.task.base_constraint.tolerance._b /= 10
         self.task.base_constraint.tolerance._c /= 10
