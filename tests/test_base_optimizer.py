@@ -32,8 +32,8 @@ from timor.task.Task import Task
 from timor.utilities.tolerated_pose import ToleratedPose
 
 from base_opt.base_opt import config, evaluate_algorithm, hyperparameter_optimization
-from base_opt.base_opt.BaseOptimizer import BOOptimizer, BaseOptimizationHistory, BaseOptimizerBase, DummyOptimizer, \
-    GAOptimizer, GreedyOptimizer, RandomBaseOptimizer, RandomGrid
+from base_opt.base_opt.BaseOptimizer import AdamOptimizer, BOOptimizer, BaseOptimizationHistory, BaseOptimizerBase, \
+    DummyOptimizer, GAOptimizer, RandomBaseOptimizer, RandomGrid
 from base_opt.utilities.Proxies import BaseChangeEnvironment
 
 
@@ -149,22 +149,25 @@ class TestBaseOptimizer(unittest.TestCase):
 
     def test_greedy_optimizer(self):
         """Test that the greedy optimizer works on a simple task and environment."""
-        self._test_optimizer(GreedyOptimizer)
+        self._test_optimizer(AdamOptimizer)
 
-    def test_greedy_optimizer_improves_action(self):
+    def test_adam_optimizer_improves_action(self):
         """Test whether greed optimizer improves a really poor action in big search space."""
         self.task.base_constraint.tolerance._a *= 10
         self.task.base_constraint.tolerance._b *= 10
         self.task.base_constraint.tolerance._c *= 10
         action = np.array([1., 1., 1.])  # far away from nominal
-        new_action = GreedyOptimizer({})._improve_guess(self.single_step_env, action)
+        opt = AdamOptimizer(dict(local_search_steps=10, lr=.2, local_ik_steps=100))
+        opt._reset_next_action(self.single_step_env)
+        new_action = opt._improve_guess(self.single_step_env, action)
         self.assertTrue(np.any(new_action != action))
         result_old = [self.single_step_env.step(action) for _ in range(10)]
         self.assertTrue(self.assembly.robot.placement == self.single_step_env.action2base_pose(action))
         result_new = [self.single_step_env.step(new_action) for _ in range(10)]
         self.assertTrue(self.assembly.robot.placement == self.single_step_env.action2base_pose(new_action))
-        self.assertGreater(np.mean([r[1] for r in result_new]), np.mean([r[1] for r in result_old]),
-                           "Greedy optimizer did not improve action rewards")
+        self.assertGreater(np.mean([r[4].get('filter_fail', False) for r in result_old]),
+                           np.mean([r[4].get('filter_fail', False) for r in result_new]),
+                           "Greedy optimizer did not improve number of filter fails")
 
         self.task.base_constraint.tolerance._a /= 10
         self.task.base_constraint.tolerance._b /= 10

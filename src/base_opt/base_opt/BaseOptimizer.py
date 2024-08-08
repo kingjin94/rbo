@@ -10,8 +10,8 @@ import uuid
 import numpy as np
 import pandas as pd
 from pygad import pygad
-import scipy.optimize
 import skopt
+import torch.optim
 
 from mcs.optimize.Sampler import GridSampler
 from timor import Transformation
@@ -300,45 +300,147 @@ class RandomBaseOptimizer(BaseOptimizerBase):
             self._evaluate(action)
 
 
-class GreedyOptimizer(RandomBaseOptimizer):
-    """Greedy optimizer that follows the gradient towards the best robot base pose"""
+class GradientOptimizer(RandomBaseOptimizer):
+    """Gradient optimizer that follows the gradient towards a locally good robot base pose"""
+
+    def __init__(self, hp: Dict, solution_storage: Optional[Path] = None):
+        """Initialize with number of local search steps and IK steps to take."""
+        super().__init__(hp, solution_storage)
+        self._local_search_steps = hp.get("local_search_steps", 10)
+        self._local_ik_steps = hp.get("local_ik_steps", 100)
 
     @property
     def specs(self) -> Dict:
         """Return a dictionary with the specs of the optimizer."""
-        return {"alg": "GreedyOptimizer"}  # TODO: Add hyperparameters such as greedy/restart trade-off
+        return {"alg": "GradientOptimizer",
+                "local_search_steps": self._local_search_steps,
+                "local_ik_steps": self._local_ik_steps}
 
     def _next_action(self, env: BaseChangeEnvironment) -> np.ndarray:
         """Return the next action to take."""
         guess = env.action_space.sample()
+        return self._improve_guess(env, guess)
+
+    @abc.abstractmethod
+    def _take_local_step(self, env: BaseChangeEnvironment, T_closest: Dict[str, Transformation],
+                         guess: np.ndarray) -> np.ndarray:
+        """
+        Take a local step towards a better robot base pose; return that better action.
+
+        :param env: The environment to optimize in.
+        :param T_closest: The closest end-effector poses found for each goal for the current guess.
+        :param guess: The current guess for the action to take.
+        """
+        pass
+
+    def _improve_guess(self, env: BaseChangeEnvironment, guess: np.ndarray) -> np.ndarray:
+        """
+        Improve the guess by taking local steps towards a better robot base pose.
+        """
+        robot = env.task_solver.robot
+        q_closest = {}
+        for _ in range(self._local_search_steps):
+            guess_base = env.action2base_pose(guess)
+            robot.set_base_placement(guess_base)
+            q_closest = {g.id: robot.ik(g.goal_pose, max_iter=self._local_ik_steps,
+                                        q_init=q_closest[g.id][0] if g.id in q_closest else None)
+                         for g in env.task.goals}
+            if all(ik_res[1] for ik_res in q_closest.values()):  # Short circuit if all goals are already solved
+                return guess
+            T_closest = {g_id: guess_base.inv @ robot.fk(q) for g_id, (q, _) in q_closest.items()}
+            guess = self._take_local_step(env, T_closest, guess)
+        return guess
+
+        #     def evaluate_candidate(a) -> float:
+        #         """
+        #         Calculate average distance to goal if action a instead of guess is taken to move the base
+        #
+        #         with same IK solutions. Overall should be rather cheap as no kinematic calculations included.
+        #         """
+        #         base = env.action2base_pose(a)
+        #         new_eef = {g_id: base @ T for g_id, T in T_closest.items()}
+        #         delta = {g_id: env.task.goals_by_id[g_id].goal_pose.nominal.in_world_coordinates().distance(eef)
+        #                  for g_id, eef in new_eef.items()}
+        #         # TODO Add IK step(s)? - way more expensive...
+        #         return np.mean([(0. if env.task.goals_by_id[g_id].goal_pose.valid(new_eef[g_id])
+        #                          else delta[g_id].translation_euclidean) for g_id in delta])
+        #
+        #     if method == 'scipy':
+        #         refined_guess = scipy.optimize.minimize(
+        #             evaluate_candidate, guess,
+        #             bounds=[(mini, maxi) for mini, maxi in zip(env.action_space.low, env.action_space.high)],
+        #             options={}
+        #         )
+        #         assert evaluate_candidate(refined_guess.x) <= evaluate_candidate(guess), \
+        #             f"Refined guess {refined_guess.x} is not better than initial guess {guess}"
+        #         if np.linalg.norm(refined_guess.x - guess) < 1e-3:
+        #             break
+        #         guess = refined_guess.x
+        #     elif method == 'mean':
+        #         best_bases = {g_id:
+        #                   env.task.goals_by_id[g_id].goal_pose.nominal.in_world_coordinates() @ T_closest[g_id].inv
+        #                       for g_id in T_closest.keys()}
+        #         mean_base = np.mean([T.translation for T in best_bases.values()], axis=0)
+        #         mean_base_pose = Transformation.from_translation(mean_base)
+        #         bounds = base_constraint2cartesian_xyz(env.task.base_constraint)
+        #         bounds = bounds.stacked
+        #         nominal = env.task.base_constraint.base_pose.nominal.in_world_coordinates()
+        #         base_offset = (nominal.inv @ mean_base_pose).translation
+        #         action = (base_offset - bounds[:, 0]) / (bounds[:, 1] - bounds[:, 0])
+        #         guess = 2 * action - 1
+        #         assert env.action2base_pose(guess).distance(mean_base_pose).translation_euclidean < 1e-3, \
+        #             "Mapping desired base pose to action failed"
+        #     elif method == "adam":
+        #         # Look backwards - where should robot stand such that IKs solve goals?
+        #         best_bases = \
+        #             {g_id: env.task.goals_by_id[g_id].goal_pose.nominal.in_world_coordinates() @ T_closest[g_id].inv
+        #              for g_id in T_closest.keys()}
+        #         mean_base = np.mean([T.translation for T in best_bases.values()], axis=0)
+        #         # Move toward mean best pose - proportional to gradient in action space
+        #         guess_param.grad = torch.tensor(guess_base.translation - mean_base)
+        #         opt.step()
+        #         guess = guess_param.detach().numpy().clip(env.action_space.low, env.action_space.high)
+        # return guess
+
+
+class AdamOptimizer(GradientOptimizer):
+    """
+    Use adam for choosing local steps relative to gradient.
+
+    :cite: https://arxiv.org/abs/1412.6980
+    """
+
+    def __init__(self, hp: Dict, solution_storage: Optional[Path] = None):
+        """Initialize with learning rate (and dtype) for the adam optimizer."""
+        super().__init__(hp, solution_storage)
+        self._lr = hp.get("lr", 0.2)
+        self._dtype = hp.get("dtype", torch.float32)
+
+    @property
+    def specs(self) -> Dict:
+        """Return a dictionary with the specs of the optimizer."""
+        ret = super().specs
+        ret.update({"alg": "AdamOptimizer", "lr": self._lr})
+        return ret
+
+    def _reset_next_action(self, env: BaseChangeEnvironment):
+        self._param = torch.tensor(env.action_space.sample(), requires_grad=True)
+        self._opt = torch.optim.Adam([self._param, ], lr=self._lr)
+
+    def _take_local_step(self, env, T_closest: Dict[str, Transformation],
+                         guess: np.ndarray) -> np.ndarray:
+        # Look backwards - where should robot stand such that IKs solve goals?
         guess_base = env.action2base_pose(guess)
-        env.task_solver.robot.set_base_placement(guess_base)
-        q_closest = {g.id: env.task_solver.robot.ik(g.goal_pose) for g in env.task.goals}
-        if all(ik_res[1] for ik_res in q_closest.values()):  # Short circuit if all goals are already solved
-            return guess
-        T_closest = {g_id: guess_base.inv @ env.task_solver.robot.fk(q) for g_id, (q, _) in q_closest.items()}
-
-        def evaluate_candidate(a) -> float:
-            """
-            Calculate average distance to goal if action a instead of guess is taken to move the base
-
-            with same IK solutions. Overall should be rather cheap as no kinematic calculations included.
-            """
-            base = env.action2base_pose(a)
-            new_eef = {g_id: base @ T for g_id, T in T_closest.items()}
-            delta = {g_id: env.task.goals_by_id[g_id].goal_pose.nominal.in_world_coordinates().distance(eef)
-                     for g_id, eef in new_eef.items()}
-            # TODO Add IK step(s)? - way more expensive...
-            return np.mean([(0. if env.task.goals_by_id[g_id].goal_pose.valid(new_eef[g_id])
-                             else delta[g_id].translation_euclidean) for g_id in delta])
-
-        refined_guess = scipy.optimize.minimize(
-            evaluate_candidate, guess,
-            bounds=[(mini, maxi) for mini, maxi in zip(env.action_space.low, env.action_space.high)]
-        )
-        assert evaluate_candidate(refined_guess.x) < evaluate_candidate(guess), \
-            f"Refined guess {refined_guess.x} is not better than initial guess {guess}"
-        return refined_guess.x
+        self._param.data = torch.tensor(guess, dtype=self._dtype)
+        best_bases = \
+            {g_id: env.task.goals_by_id[g_id].goal_pose.nominal.in_world_coordinates() @ T_closest[g_id].inv
+             for g_id in T_closest.keys()}
+        mean_base = np.mean([T.translation for T in best_bases.values()], axis=0)
+        # Move toward mean best pose - proportional to gradient in action space
+        # TODO : Gradient for rotation?
+        self._param.grad = torch.tensor(guess_base.translation - mean_base, dtype=self._dtype)
+        self._opt.step()
+        return self._param.detach().numpy().clip(env.action_space.low, env.action_space.high)
 
 
 class DummyOptimizer(RandomBaseOptimizer):
@@ -480,5 +582,5 @@ str_to_base_optimizer = {
     "RandomGrid": RandomGrid,
     "GAOptimizer": GAOptimizer,
     "BOOptimizer": BOOptimizer,
-    "GreedyOptimizer": GreedyOptimizer
+    "AdamOptimizer": AdamOptimizer
 }
