@@ -28,6 +28,15 @@ BOOptimizer:
     acq_func_kwargs:
       xi: 0.09728621285669029
 
+AdamOptimizer:
+  best:
+    # TODO : Dummy _before_ hyperparameter optimization
+    lr: 0.2
+    local_ik_iter: 100
+    local_opt_steps: 10
+    beta1: 0.9
+    beta2: 0.999
+
 RandomBaseOptimizer:
   best:
     # Empty

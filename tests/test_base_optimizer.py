@@ -151,24 +151,33 @@ class TestBaseOptimizer(unittest.TestCase):
         """Test that the greedy optimizer works on a simple task and environment."""
         self._test_optimizer(AdamOptimizer)
 
-    def test_adam_optimizer_improves_action(self):
+    def test_adam_optimizer_improves_action(self, num_pts=8):
         """Test whether greed optimizer improves a really poor action in big search space."""
         self.task.base_constraint.tolerance._a *= 10
         self.task.base_constraint.tolerance._b *= 10
         self.task.base_constraint.tolerance._c *= 10
-        action = np.array([1., 1., 1.])  # far away from nominal
         opt = AdamOptimizer(dict(local_search_steps=10, lr=.2, local_ik_steps=100))
-        opt._reset_next_action(self.single_step_env)
-        new_action = opt._improve_guess(self.single_step_env, action)
-        self.assertTrue(np.any(new_action != action))
-        result_old = [self.single_step_env.step(action) for _ in range(10)]
-        self.assertTrue(self.assembly.robot.placement == self.single_step_env.action2base_pose(action))
-        result_new = [self.single_step_env.step(new_action) for _ in range(10)]
-        self.assertTrue(self.assembly.robot.placement == self.single_step_env.action2base_pose(new_action))
+        result_new = []
+        result_old = []
+        local_opt_time = 0
+        for i in range(num_pts):
+            action = np.array((i % 2, (i // 2) % 2, i // 4)) * 2. - 1.  # Edge of action space
+            opt._reset_next_action(self.single_step_env)
+            t0 = process_time()
+            new_action = opt._improve_guess(self.single_step_env, action)
+            local_opt_time += process_time() - t0
+            # self.assertTrue(np.any(new_action != action))
+            result_old += [self.single_step_env.step(action) for _ in range(10)]
+            self.assertTrue(self.assembly.robot.placement == self.single_step_env.action2base_pose(action))
+            result_new += [self.single_step_env.step(new_action) for _ in range(10)]
+            self.assertTrue(self.assembly.robot.placement == self.single_step_env.action2base_pose(new_action))
         self.assertGreater(np.mean([r[4].get('filter_fail', False) for r in result_old]),
                            np.mean([r[4].get('filter_fail', False) for r in result_new]),
                            "Greedy optimizer did not improve number of filter fails")
-
+        self.assertGreater(np.mean([r[1] for r in result_new]),
+                           np.mean([r[1] for r in result_old]),
+                           "Greedy optimizer did not improve reward")
+        print(f"Local optimization took {local_opt_time / num_pts} seconds per try.")
         self.task.base_constraint.tolerance._a /= 10
         self.task.base_constraint.tolerance._b /= 10
         self.task.base_constraint.tolerance._c /= 10
@@ -239,6 +248,10 @@ class TestBaseOptimizer(unittest.TestCase):
         """Test that BOOptimizer can be evaluated."""
         self._test_eval_alg('BOOptimizer')
 
+    def test_evaluate_algorithm_Adam(self):
+        """Test that BOOptimizer can be evaluated."""
+        self._test_eval_alg('AdamOptimizer')
+
     def _test_hyper_opt_alg(self, alg_name, additional_args=None, n_trials: int = 4):
         with tempfile.TemporaryDirectory() as d:
             storage = f'sqlite:///{d}/optuna.db'
@@ -269,6 +282,10 @@ class TestBaseOptimizer(unittest.TestCase):
     def test_hyper_opt_algorithm_BO(self):
         """Test that BOOptimizer can be hyperparameter optimized."""
         self._test_hyper_opt_alg('BOOptimizer')
+
+    def test_hyper_opt_algorithm_Adam(self):
+        """Test that BOOptimizer can be hyperparameter optimized."""
+        self._test_hyper_opt_alg('AdamOptimizer')
 
     def test_success_chance_default_task_solver(self, test_n_tasks: int = 10):
         """Test how likely it is to solve each task with the default task solver at the nominal position."""
