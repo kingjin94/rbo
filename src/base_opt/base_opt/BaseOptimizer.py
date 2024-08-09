@@ -437,8 +437,8 @@ class AdamOptimizer(GradientOptimizer):
         base = self._env.action2base_pose(action)  # TODO needs tensor version
         delta = (base @ eef_is).inverse() @ eef_goal
         translation_error = delta[:3, 3].norm(dim=-1)
-        rotation_error = torch.acos((delta[:3, :3].trace() - 1) / 2)  # angle of rotation
-        if rotation_error < 1e-3 or rotation_error > np.pi - 1e-3:
+        rotation_error = torch.acos((delta[:3, :3].trace() - 1) / 2)  # angle of rotation  # TODO still NAN prone
+        if rotation_error < -1 + 1e-3 or rotation_error > 1. - 1e-3:
             rotation_error = 0.  # Avoid numerical instability at edge of acos - no difference for rot. needed anyway
         translation_weight = 1.
         rotation_weight = .5 / np.pi
@@ -450,7 +450,7 @@ class AdamOptimizer(GradientOptimizer):
         # Look backwards - where should robot stand such that IKs solve goals?
         self._param.data = torch.tensor(guess, dtype=self._dtype)
         self._opt.zero_grad()
-        with torch.autograd.detect_anomaly():
+        with torch.autograd.detect_anomaly():  # TODO : Remove once more stable
             tmp_cost = {g_id: self._tensor_ik_cost_function(
                         self._param,
                         torch.tensor(T.homogeneous, dtype=self._dtype),
