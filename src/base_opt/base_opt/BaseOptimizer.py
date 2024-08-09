@@ -434,12 +434,19 @@ class AdamOptimizer(GradientOptimizer):
         self._env = env
 
     def _tensor_ik_cost_function(self, action: torch.Tensor, eef_is: torch.Tensor, eef_goal: torch.Tensor):
-        base = self._env.action2base_pose(action)  # TODO needs tensor version
-        delta = (base @ eef_is).inverse() @ eef_goal
+        base = self._env.action2base_pose(action)
+        eef = base @ eef_is
+        eef_inv = torch.eye(4, dtype=self._dtype)
+        eef_inv[:3, :3] = eef[:3, :3].t()
+        eef_inv[:3, 3] = -eef[:3, :3].t() @ eef[:3, 3]
+        delta = eef_inv @ eef_goal  # TODO Inverse reason for inf/nan?
         translation_error = delta[:3, 3].norm(dim=-1)
-        rotation_error = torch.acos((delta[:3, :3].trace() - 1) / 2)  # angle of rotation  # TODO still NAN prone
-        if rotation_error < -1 + 1e-3 or rotation_error > 1. - 1e-3:
-            rotation_error = 0.  # Avoid numerical instability at edge of acos - no difference for rot. needed anyway
+        if delta[:3, :3].trace() > 2.999:  # cut off boundaries
+            rotation_error = 0.
+        elif delta[:3, :3].trace() < -0.9999:  # cut off boundaries
+            rotation_error = np.pi
+        else:
+            rotation_error = torch.acos((delta[:3, :3].trace() - 1) / 2)  # angle of rotation  # TODO still NAN prone
         translation_weight = 1.
         rotation_weight = .5 / np.pi
         return (translation_weight * translation_error + rotation_weight * rotation_error) / \
@@ -459,7 +466,7 @@ class AdamOptimizer(GradientOptimizer):
                             dtype=self._dtype))
                         for g_id, T in T_closest.items()}
             mean_cost = torch.mean(torch.stack(list(tmp_cost.values())))
-            mean_cost.backward(retain_graph=True)
+            mean_cost.backward(retain_graph=True, create_graph=True)
         self._opt.step()
         return self._param.detach().numpy().clip(env.action_space.low, env.action_space.high)
 
