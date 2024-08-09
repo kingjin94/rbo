@@ -431,19 +431,35 @@ class AdamOptimizer(GradientOptimizer):
         self._param = torch.tensor(env.action_space.sample(), requires_grad=True)
         self._opt = torch.optim.Adam(
             [self._param, ], lr=self.hp["lr"], betas=(self.hp["beta1"], self.hp["beta2"]))
+        self._env = env
+
+    def _tensor_ik_cost_function(self, action: torch.Tensor, eef_is: torch.Tensor, eef_goal: torch.Tensor):
+        base = self._env.action2base_pose(action)  # TODO needs tensor version
+        delta = (base @ eef_is).inverse() @ eef_goal
+        translation_error = delta[:3, 3].norm(dim=-1)
+        rotation_error = torch.acos((delta[:3, :3].trace() - 1) / 2)  # angle of rotation
+        if rotation_error < 1e-3 or rotation_error > np.pi - 1e-3:
+            rotation_error = 0.  # Avoid numerical instability at edge of acos - no difference for rot. needed anyway
+        translation_weight = 1.
+        rotation_weight = .5 / np.pi
+        return (translation_weight * translation_error + rotation_weight * rotation_error) / \
+            (translation_weight + rotation_weight)
 
     def _take_local_step(self, env, T_closest: Dict[str, Transformation],
                          guess: np.ndarray) -> np.ndarray:
         # Look backwards - where should robot stand such that IKs solve goals?
-        guess_base = env.action2base_pose(guess)
         self._param.data = torch.tensor(guess, dtype=self._dtype)
-        best_bases = \
-            {g_id: env.task.goals_by_id[g_id].goal_pose.nominal.in_world_coordinates() @ T_closest[g_id].inv
-             for g_id in T_closest.keys()}
-        mean_base = np.mean([T.translation for T in best_bases.values()], axis=0)
-        # Move toward mean best pose - proportional to gradient in action space
-        # TODO : Gradient for rotation?
-        self._param.grad = torch.tensor(guess_base.translation - mean_base, dtype=self._dtype)
+        self._opt.zero_grad()
+        with torch.autograd.detect_anomaly():
+            tmp_cost = {g_id: self._tensor_ik_cost_function(
+                        self._param,
+                        torch.tensor(T.homogeneous, dtype=self._dtype),
+                        torch.tensor(
+                            env.task.goals_by_id[g_id].goal_pose.nominal.in_world_coordinates().homogeneous,
+                            dtype=self._dtype))
+                        for g_id, T in T_closest.items()}
+            mean_cost = torch.mean(torch.stack(list(tmp_cost.values())))
+            mean_cost.backward(retain_graph=True)
         self._opt.step()
         return self._param.detach().numpy().clip(env.action_space.low, env.action_space.high)
 

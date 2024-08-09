@@ -1,8 +1,9 @@
-from typing import Any, Dict, Iterable, Optional, Tuple
+from typing import Any, Dict, Iterable, Optional, Tuple, Union
 
 import gymnasium as gym
 import numpy as np
 from scipy.spatial.transform import Rotation
+import torch
 
 from mcs.TaskSolver import TaskSolverBase
 from mcs.environments.Proxies import FixedPenaltyTaskSolverAssemblyEvaluationEnvironment
@@ -38,7 +39,8 @@ def base_constraint2cartesian_xyz(base_constraint: Constraints.BasePlacement) ->
     return tolerance
 
 
-def xyz_to_transformation(action: np.ndarray, base_constraint: Constraints.BasePlacement) -> Transformation:
+def xyz_to_transformation(action: Union[np.ndarray, torch.Tensor],
+                          base_constraint: Constraints.BasePlacement) -> Transformation:
     """
     Map an action in [-1, 1]^3 to a base pose within the base constraint.
 
@@ -47,12 +49,21 @@ def xyz_to_transformation(action: np.ndarray, base_constraint: Constraints.BaseP
     action = (action + 1) / 2  # Scale to [0, 1]
     bounds = base_constraint2cartesian_xyz(base_constraint)
     bounds = bounds.stacked
+    if isinstance(action, torch.Tensor):
+        bounds = torch.tensor(bounds, device=action.device, dtype=action.dtype)
     desired_offset = bounds[:, 0] + action * (bounds[:, 1] - bounds[:, 0])  # Lin. interpolation
+    if isinstance(action, torch.Tensor):
+        desired_T = torch.eye(4, device=action.device)
+        desired_T[:3, 3] = desired_offset
+        return torch.tensor(
+            base_constraint.base_pose.nominal.in_world_coordinates().homogeneous,
+            device=action.device, dtype=action.dtype) @ desired_T
     return (base_constraint.base_pose.nominal.in_world_coordinates() @
             Transformation.from_translation(desired_offset))
 
 
-def xyz_rotvec_to_transformation(action: np.ndarray, base_constraint: Constraints.BasePlacement) -> Transformation:
+def xyz_rotvec_to_transformation(action: Union[np.ndarray, torch.Tensor],
+                                 base_constraint: Constraints.BasePlacement) -> Transformation:
     """
     Map an action in [-1, 1]^6 to a base pose within the base constraint.
 
@@ -60,8 +71,20 @@ def xyz_rotvec_to_transformation(action: np.ndarray, base_constraint: Constraint
     The rotation is _not_ limited to the base constraint, but -1 = rotation by -pi in this axis, +1 = rotation by pi
     """
     translation = xyz_to_transformation(action[:3], base_constraint)
-    rotation = Rotation.from_rotvec(action[3:] * np.pi)  # Any rotation vector up to pi about arbitrary axis
-    return translation @ Transformation.from_rotation(rotation.as_matrix())
+    # Any rotation vector up to pi about arbitrary axis
+    if isinstance(action, np.ndarray):
+        T_rot = Transformation.from_rotation(Rotation.from_rotvec(action[3:] * np.pi).as_matrix())
+    else:
+        rot_vec = action[3:] * np.pi
+        theta = torch.norm(rot_vec)
+        T_rot = torch.eye(4, device=action.device, dtype=action.dtype)
+        if theta > 1e-3:  # Otherwise unstable division and close by anyway
+            axis = rot_vec / theta
+            K = torch.tensor([[0, -axis[2], axis[1]],
+                             [axis[2], 0, -axis[0]],
+                             [-axis[1], axis[0], 0]], device=action.device, dtype=action.dtype)
+            T_rot[:3, :3] += torch.sin(theta) * K + (1 - torch.cos(theta)) * K @ K
+    return translation @ T_rot
 
 
 class BaseChangeEnvironment(FixedPenaltyTaskSolverAssemblyEvaluationEnvironment):
@@ -140,7 +163,7 @@ class BaseChangeEnvironment(FixedPenaltyTaskSolverAssemblyEvaluationEnvironment)
         """Calculate the observation dict."""
         return {}
 
-    def action2base_pose(self, action: np.ndarray):
+    def action2base_pose(self, action: Union[np.ndarray, torch.Tensor]):
         """Map an action to a base pose within the base constraint."""
         try:
             base_constraint = self.task.base_constraint

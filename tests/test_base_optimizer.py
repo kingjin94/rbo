@@ -106,6 +106,10 @@ class TestBaseOptimizer(unittest.TestCase):
         self.single_step_env = BaseChangeEnvironment(self.assembly, self.task_solver,
                                                      CostFunctions.CycleTime(),
                                                      self.task, reward_fail=-20.)
+        self.single_step_env_rot = BaseChangeEnvironment(self.assembly, self.task_solver,
+                                                         CostFunctions.CycleTime(),
+                                                         self.task, reward_fail=-20.,
+                                                         action2base_pose='xyz_rotvec')
         self.timeout_base_opt = 20.  # Timeout for base optimizer in seconds
 
     def _assert_success(self, action, reward, info):
@@ -173,6 +177,41 @@ class TestBaseOptimizer(unittest.TestCase):
             self.assertTrue(self.assembly.robot.placement == self.single_step_env.action2base_pose(action))
             result_new += [self.single_step_env.step(new_action) for _ in range(10)]
             self.assertTrue(self.assembly.robot.placement == self.single_step_env.action2base_pose(new_action))
+        self.assertGreater(np.mean([r[4].get('filter_fail', False) for r in result_old]),
+                           np.mean([r[4].get('filter_fail', False) for r in result_new]),
+                           "Greedy optimizer did not improve number of filter fails")
+        self.assertGreater(np.mean([r[1] for r in result_new]),
+                           np.mean([r[1] for r in result_old]),
+                           "Greedy optimizer did not improve reward")
+        print(f"Local optimization took {local_opt_time / num_pts} seconds per try.")
+        print("Optimized actions mean+/-std: "
+              f"{np.mean(optimized_actions, axis=0)} +/- {np.std(optimized_actions, axis=0)}")
+        print(f"Optimized actions: {optimized_actions}")
+        self.task.base_constraint.tolerance._a /= 10
+        self.task.base_constraint.tolerance._b /= 10
+        self.task.base_constraint.tolerance._c /= 10
+
+    def test_adam_optimizer_improves_action_rotvec(self, num_pts=8):
+        """test adam also works in 6D xyz + rotvec space"""
+        self.task.base_constraint.tolerance._a *= 10
+        self.task.base_constraint.tolerance._b *= 10
+        self.task.base_constraint.tolerance._c *= 10
+        opt = AdamOptimizer(dict(local_search_steps=10, lr=.2, local_ik_steps=100))
+        result_new = []
+        result_old = []
+        optimized_actions = []
+        local_opt_time = 0
+        for i in range(num_pts):
+            action = np.array((i % 2, (i // 2) % 2, i // 4, i % 2, (i // 2) % 2, i // 4)) * 2. - 1.
+            opt._reset_next_action(self.single_step_env_rot)
+            t0 = process_time()
+            new_action = opt._improve_guess(self.single_step_env_rot, action)
+            optimized_actions.append(new_action)
+            local_opt_time += process_time() - t0
+            result_old += [self.single_step_env_rot.step(action) for _ in range(10)]
+            self.assertTrue(self.assembly.robot.placement == self.single_step_env_rot.action2base_pose(action))
+            result_new += [self.single_step_env_rot.step(new_action) for _ in range(10)]
+            self.assertTrue(self.assembly.robot.placement == self.single_step_env_rot.action2base_pose(new_action))
         self.assertGreater(np.mean([r[4].get('filter_fail', False) for r in result_old]),
                            np.mean([r[4].get('filter_fail', False) for r in result_new]),
                            "Greedy optimizer did not improve number of filter fails")
