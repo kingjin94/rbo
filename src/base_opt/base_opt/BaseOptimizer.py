@@ -301,10 +301,18 @@ class RandomBaseOptimizer(BaseOptimizerBase):
 
 
 class GradientOptimizer(RandomBaseOptimizer):
-    """Gradient optimizer that follows the gradient towards a locally good robot base pose"""
+    """Gradient optimizer that follows the gradient towards a locally good robot base pose."""
 
     def __init__(self, hp: Dict, solution_storage: Optional[Path] = None):
-        """Initialize with number of local search steps and IK steps to take."""
+        """
+        Initialize with number of local search steps and IK steps to take.
+
+        :param hp: Dict of hyperparameters for the optimizer.
+                     * local_search_steps: Number of local search steps to take to optimize random guess (default 10).
+                     * local_ik_steps: Number of inverse kinematics (IK) steps to take in each local search step
+                                       (default 100). With this the joint angles are adapted to the changed base pose
+                                       to minimize the distance to the goal poses.
+        """
         super().__init__(hp, solution_storage)
         self._local_search_steps = hp.get("local_search_steps", 10)
         self._local_ik_steps = hp.get("local_ik_steps", 100)
@@ -328,8 +336,8 @@ class GradientOptimizer(RandomBaseOptimizer):
         Take a local step towards a better robot base pose; return that better action.
 
         :param env: The environment to optimize in.
-        :param T_closest: The closest end-effector poses found for each goal for the current guess.
-        :param guess: The current guess for the action to take.
+        :param T_closest: The closest end-effector poses found for each goal for the current guess with inv. kin.
+        :param guess: The current guess for the action (= parameters of base pose) to take.
         """
         pass
 
@@ -350,57 +358,6 @@ class GradientOptimizer(RandomBaseOptimizer):
             T_closest = {g_id: guess_base.inv @ robot.fk(q) for g_id, (q, _) in q_closest.items()}
             guess = self._take_local_step(env, T_closest, guess)
         return guess
-
-        #     def evaluate_candidate(a) -> float:
-        #         """
-        #         Calculate average distance to goal if action a instead of guess is taken to move the base
-        #
-        #         with same IK solutions. Overall should be rather cheap as no kinematic calculations included.
-        #         """
-        #         base = env.action2base_pose(a)
-        #         new_eef = {g_id: base @ T for g_id, T in T_closest.items()}
-        #         delta = {g_id: env.task.goals_by_id[g_id].goal_pose.nominal.in_world_coordinates().distance(eef)
-        #                  for g_id, eef in new_eef.items()}
-        #         # TODO Add IK step(s)? - way more expensive...
-        #         return np.mean([(0. if env.task.goals_by_id[g_id].goal_pose.valid(new_eef[g_id])
-        #                          else delta[g_id].translation_euclidean) for g_id in delta])
-        #
-        #     if method == 'scipy':
-        #         refined_guess = scipy.optimize.minimize(
-        #             evaluate_candidate, guess,
-        #             bounds=[(mini, maxi) for mini, maxi in zip(env.action_space.low, env.action_space.high)],
-        #             options={}
-        #         )
-        #         assert evaluate_candidate(refined_guess.x) <= evaluate_candidate(guess), \
-        #             f"Refined guess {refined_guess.x} is not better than initial guess {guess}"
-        #         if np.linalg.norm(refined_guess.x - guess) < 1e-3:
-        #             break
-        #         guess = refined_guess.x
-        #     elif method == 'mean':
-        #         best_bases = {g_id:
-        #                   env.task.goals_by_id[g_id].goal_pose.nominal.in_world_coordinates() @ T_closest[g_id].inv
-        #                       for g_id in T_closest.keys()}
-        #         mean_base = np.mean([T.translation for T in best_bases.values()], axis=0)
-        #         mean_base_pose = Transformation.from_translation(mean_base)
-        #         bounds = base_constraint2cartesian_xyz(env.task.base_constraint)
-        #         bounds = bounds.stacked
-        #         nominal = env.task.base_constraint.base_pose.nominal.in_world_coordinates()
-        #         base_offset = (nominal.inv @ mean_base_pose).translation
-        #         action = (base_offset - bounds[:, 0]) / (bounds[:, 1] - bounds[:, 0])
-        #         guess = 2 * action - 1
-        #         assert env.action2base_pose(guess).distance(mean_base_pose).translation_euclidean < 1e-3, \
-        #             "Mapping desired base pose to action failed"
-        #     elif method == "adam":
-        #         # Look backwards - where should robot stand such that IKs solve goals?
-        #         best_bases = \
-        #             {g_id: env.task.goals_by_id[g_id].goal_pose.nominal.in_world_coordinates() @ T_closest[g_id].inv
-        #              for g_id in T_closest.keys()}
-        #         mean_base = np.mean([T.translation for T in best_bases.values()], axis=0)
-        #         # Move toward mean best pose - proportional to gradient in action space
-        #         guess_param.grad = torch.tensor(guess_base.translation - mean_base)
-        #         opt.step()
-        #         guess = guess_param.detach().numpy().clip(env.action_space.low, env.action_space.high)
-        # return guess
 
 
 class AdamOptimizer(GradientOptimizer):
@@ -434,30 +391,34 @@ class AdamOptimizer(GradientOptimizer):
         self._env = env
 
     def _tensor_ik_cost_function(self, action: torch.Tensor, eef_is: torch.Tensor, eef_goal: torch.Tensor):
+        """PyTorch Version of the default IK cost function in timor.robot.Robot."""
         base = self._env.action2base_pose(action)
-        eef = base @ eef_is
+        eef = base @ eef_is  # Pose of end-effector with this base pose
         eef_inv = torch.eye(4, dtype=self._dtype)
-        eef_inv[:3, :3] = eef[:3, :3].t()
-        eef_inv[:3, 3] = -eef[:3, :3].t() @ eef[:3, 3]
-        delta = eef_inv @ eef_goal  # TODO Inverse reason for inf/nan?
+        eef_inv[:3, :3] = eef[:3, :3].t()  # Inverse of rotation is transposed
+        eef_inv[:3, 3] = -eef[:3, :3].t() @ eef[:3, 3]  # Inverse of end-effector position
+        delta = eef_inv @ eef_goal
         translation_error = delta[:3, 3].norm(dim=-1)
-        if delta[:3, :3].trace() > 2.999:  # cut off boundaries
+        if delta[:3, :3].trace() > 2.999:  # cut off boundaries of rotation
             rotation_error = 0.
-        elif delta[:3, :3].trace() < -0.9999:  # cut off boundaries
+        elif delta[:3, :3].trace() < -0.9999:  # cut off boundaries of rotation
             rotation_error = np.pi
         else:
-            rotation_error = torch.acos((delta[:3, :3].trace() - 1) / 2)  # angle of rotation  # TODO still NAN prone
-        translation_weight = 1.
+            rotation_error = torch.acos((delta[:3, :3].trace() - 1) / 2)  # angle of rotation via Rodrigues formula
+        translation_weight = 1.  # Same as timor.robot.Robot.default_ik_cost_function
         rotation_weight = .5 / np.pi
         return (translation_weight * translation_error + rotation_weight * rotation_error) / \
             (translation_weight + rotation_weight)
 
-    def _take_local_step(self, env, T_closest: Dict[str, Transformation],
+    def _take_local_step(self, env: BaseChangeEnvironment, T_closest: Dict[str, Transformation],
                          guess: np.ndarray) -> np.ndarray:
-        # Look backwards - where should robot stand such that IKs solve goals?
-        self._param.data = torch.tensor(guess, dtype=self._dtype)
+        """
+        Use adam to take a local step towards a better robot base pose.
+        """
+        self._param.data = torch.tensor(guess, dtype=self._dtype)  # Set initial guess
         self._opt.zero_grad()
-        with torch.autograd.detect_anomaly():  # TODO : Remove once more stable
+        with torch.autograd.detect_anomaly():  # Detect any nan or inf in gradients
+            # Calculate cost for each goal
             tmp_cost = {g_id: self._tensor_ik_cost_function(
                         self._param,
                         torch.tensor(T.homogeneous, dtype=self._dtype),
