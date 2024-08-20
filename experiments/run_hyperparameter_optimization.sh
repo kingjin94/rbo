@@ -26,4 +26,4 @@ python src/base_opt/base_opt/hyperparameter_optimization.py \
   --timeout 240 \
   --storage sqlite:///data/optuna.db \
   --algorithm AdamOptimizer \
-  --study-name AdamOpimization_prune_longer -optimize
+  --study-name AdamOpimization_prune_longer_autograd -optimize
