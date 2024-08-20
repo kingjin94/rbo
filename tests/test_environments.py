@@ -203,6 +203,7 @@ class BaseChangeEnvironmentTests(unittest.TestCase):
                 np_test.assert_almost_equal(T_torch.detach().numpy(), T_normal.homogeneous, decimal=5)
                 T_torch.sum().backward()
                 self.assertIsNotNone(a_torch.grad)
+                np_test.assert_array_less(1e-5, np.abs(a_torch.grad.numpy()))  # Highly unlikely that any 0 gradient
 
 
 if __name__ == '__main__':

@@ -74,7 +74,7 @@ def xyz_rotvec_to_transformation(action: Union[np.ndarray, torch.Tensor],
     # Any rotation vector up to pi about arbitrary axis
     if isinstance(action, np.ndarray):
         T_rot = Transformation.from_rotation(Rotation.from_rotvec(action[3:] * np.pi).as_matrix())
-    else:
+    else:  # Implements pytorch and differentiable mapping to rotation
         rot_vec = action[3:] * np.pi
         theta = torch.norm(rot_vec)
         T_rot = torch.eye(4, device=action.device, dtype=action.dtype)

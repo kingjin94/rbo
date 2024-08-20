@@ -15,6 +15,8 @@ import numpy as np
 import numpy.testing as np_test
 import optuna
 import pandas as pd
+from timor.utilities.spatial import rotX
+import torch
 
 import cobra.task.task
 
@@ -420,3 +422,64 @@ class TestBaseOptimizer(unittest.TestCase):
             print(f"Average reward on success: {np.mean(rewards)} +/- {np.std(rewards)}")
             print(f"Average runtime: {np.mean(runtimes)} +/- {np.std(runtimes)}")
             print(f"Average number of tested actions: {np.mean([len(r) for r in reward_history])}")
+
+    def test_adam_pytorch_gradients(self, n_trials=100):
+        """Test that PyTorch gradients are correctly computed."""
+        opt = AdamOptimizer({})
+        for _ in range(n_trials):
+            a = self.single_step_env_rot.action_space.sample()
+            a_tensor = torch.tensor(a, requires_grad=True)
+            T_base = self.single_step_env_rot.action2base_pose(a_tensor)
+            self.assembly.robot.set_base_placement(T_base.detach().numpy())
+            q_sol = {g_id: self.assembly.robot.ik(g.goal_pose) for g_id, g in self.task.goals_by_id.items()}
+            opt._reset_next_action(self.single_step_env_rot)
+            cost = torch.zeros(1)
+            for g_id, (q, success) in q_sol.items():
+                T_rel_base = self.assembly.robot.placement.inv @ self.assembly.robot.fk(q)
+                T_des = self.single_step_env_rot.task.goals_by_id['1'].goal_pose.nominal.in_world_coordinates()
+                cost += opt._tensor_ik_cost_function(
+                    a_tensor, torch.tensor(T_rel_base.homogeneous, dtype=a_tensor.dtype),
+                    torch.tensor(T_des.homogeneous, dtype=a_tensor.dtype))
+            cost.backward()
+            self.assertIsNotNone(a_tensor.grad)
+
+    def test_adam_pytorch_gradients_corner_case(self):
+        """Test that PyTorch gradients are correctly computed."""
+        opt = AdamOptimizer({})
+        opt._reset_next_action(self.single_step_env_rot)
+        # Corner cases
+        a_tensor = torch.tensor((0.5, 0.5, 0.5, 0.01, 0.01, 0.01), requires_grad=True)
+        T_base = self.single_step_env_rot.action2base_pose(a_tensor)
+        self.assembly.robot.set_base_placement(T_base.detach().numpy())
+        q_sol = {g_id: self.assembly.robot.ik(g.goal_pose) for g_id, g in self.task.goals_by_id.items()}
+        self.assertTrue(all(q[1] for q in q_sol.values()))
+        T_sol = {g_id: self.assembly.robot.placement.inv @ self.assembly.robot.fk(q[0]) for g_id, q in q_sol.items()}
+        for g_id, T in T_sol.items():
+            T_des = self.single_step_env_rot.task.goals_by_id['1'].goal_pose.nominal.in_world_coordinates()
+            # All the same
+            opt._tensor_ik_cost_function(a_tensor,
+                                         torch.tensor(T.homogeneous, dtype=a_tensor.dtype),
+                                         torch.tensor(T_des.homogeneous, dtype=a_tensor.dtype)).backward()
+            self.assertIsNotNone(a_tensor.grad)
+            self.assertLess(a_tensor.grad[:3].norm(), 0.2)  # Close by in translation even with IK tolerance
+            a_tensor.grad = None
+            # 180-degree rotation
+            T_rotated = T.homogeneous.copy()
+            T_rotated[:3, :3] = rotX(np.pi)[:3, :3] @ T_rotated[:3, :3]
+            opt._tensor_ik_cost_function(a_tensor,
+                                         torch.tensor(T_rotated, dtype=a_tensor.dtype),
+                                         torch.tensor(T_des.homogeneous, dtype=a_tensor.dtype)).backward()
+            self.assertIsNotNone(a_tensor.grad)
+            self.assertLess(a_tensor.grad[:3].norm(), 0.2)  # Translation close by even with IK tolerance
+            self.assertLess(.5, a_tensor.grad[3:].norm())  # Rotation with long arm more effective
+            a_tensor.grad = None
+            # Almost 180 degrees
+            T_rotated = T.homogeneous.copy()
+            T_rotated[:3, :3] = rotX(0.99 * np.pi)[:3, :3] @ T_rotated[:3, :3]
+            opt._tensor_ik_cost_function(a_tensor,
+                                         torch.tensor(T_rotated, dtype=a_tensor.dtype),
+                                         torch.tensor(T_des.homogeneous, dtype=a_tensor.dtype)).backward()
+            self.assertIsNotNone(a_tensor.grad)
+            self.assertLess(a_tensor.grad[:3].norm(), 0.2)  # Translation close by even with IK tolerance
+            self.assertLess(.5, a_tensor.grad[3:].norm())  # Rotation with long arm more effective
+            a_tensor.grad = None
