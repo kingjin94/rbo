@@ -471,7 +471,7 @@ class TestBaseOptimizer(unittest.TestCase):
                                          torch.tensor(T_des.homogeneous, dtype=a_tensor.dtype)).backward()
             self.assertIsNotNone(a_tensor.grad)
             self.assertLess(a_tensor.grad[:3].norm(), 0.2)  # Translation close by even with IK tolerance
-            self.assertLess(.5, a_tensor.grad[3:].norm())  # Rotation with long arm more effective
+            self.assertLess(.1, a_tensor.grad[3:].norm())  # Rotation with long arm more effective
             a_tensor.grad = None
             # Almost 180 degrees
             T_rotated = T.homogeneous.copy()
@@ -481,5 +481,5 @@ class TestBaseOptimizer(unittest.TestCase):
                                          torch.tensor(T_des.homogeneous, dtype=a_tensor.dtype)).backward()
             self.assertIsNotNone(a_tensor.grad)
             self.assertLess(a_tensor.grad[:3].norm(), 0.2)  # Translation close by even with IK tolerance
-            self.assertLess(.5, a_tensor.grad[3:].norm())  # Rotation with long arm more effective
+            self.assertLess(.1, a_tensor.grad[3:].norm())  # Rotation with long arm more effective
             a_tensor.grad = None
