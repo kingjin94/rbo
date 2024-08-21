@@ -29,13 +29,13 @@ BOOptimizer:
       xi: 0.09728621285669029
 
 AdamOptimizer:
+  # Trial 384 (id 3114) in AdamOpimization_prune_longer_autograd
   best:
-    # TODO : Dummy _before_ hyperparameter optimization
-    lr: 0.2
-    local_ik_iter: 100
-    local_opt_steps: 10
-    beta1: 0.9
-    beta2: 0.999
+    lr: 0.39226794198893317
+    local_ik_iter: 33
+    local_opt_steps: 44
+    beta1: 0.12508915846274096
+    beta2: 0.026105278334961533
 
 RandomBaseOptimizer:
   best:
