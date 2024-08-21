@@ -50,6 +50,7 @@ def cleanup_preprocess_results(result_df: pd.DataFrame, group_by: List[str] = No
     result_df['Algorithm'] = result_df['Algorithm'].replace({'BOOptimizer': 'BO',
                                                              'GAOptimizer': 'GA',
                                                              'RandomBaseOptimizer': 'Random',
+                                                             'AdamOptimizer': 'SGD',
                                                              'DummyOptimizer': 'Dummy'})
     # Clean up failure reasons
     result_df['Fail Reason'] = result_df['Fail Reason'].str.replace(
