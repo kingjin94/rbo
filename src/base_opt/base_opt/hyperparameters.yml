@@ -34,8 +34,8 @@ AdamOptimizer:
     lr: 0.39226794198893317
     local_ik_iter: 33
     local_opt_steps: 44
-    beta1: 0.12508915846274096
-    beta2: 0.026105278334961533
+    beta1: 0.8749108415372591  # Optuna logs 1 - beta1 as usually to be found close to 1.
+    beta2: 0.9738947216650384  # Optuna logs 1 - beta2 as usually to be found close to 1.
 
 RandomBaseOptimizer:
   best:
