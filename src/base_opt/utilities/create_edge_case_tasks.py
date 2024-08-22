@@ -263,10 +263,11 @@ if __name__ == '__main__':
             task.header = TaskHeader(
                 f"base_opt/edge_case/{obstacle_type}_{diff_level}_{i}",
                 date=datetime(2024, 7, 8, 12, 0, 0),
-                tags=["BPO25", "base pose optimization 2025", "Any base rotation", "edge_case",
-                      obstacle_type, diff_level, "3 goals"],
+                tags=["BPO24", "base pose optimization 2024", "Any base rotation", "edge_case",
+                      obstacle_type, f"edge_case_{diff_level}", "3 goals"],
                 author=["Friedrich Dang", "Matthias Mayer"],
                 email=["friedrich.dang@tum.de", "matthias.mayer@tum.de"],
-                affiliation=2 * ["Technical University of Munich"]
+                affiliation=2 * ["Technical University of Munich"],
+                version="2022"
             )
             task.to_json_file(DATA.joinpath("tasks"))
