@@ -1,15 +1,15 @@
 {
   "header": {
     "ID": "base_opt/edge_case/house_hard_6",
-    "version": "2023",
+    "version": "2022",
     "taskName": "",
     "tags": [
-      "BPO25",
-      "base pose optimization 2025",
+      "BPO24",
+      "base pose optimization 2024",
       "Any base rotation",
       "edge_case",
       "house",
-      "hard",
+      "edge_case_hard",
       "3 goals"
     ],
     "date": "2024-07-08",
