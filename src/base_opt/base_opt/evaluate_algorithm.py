@@ -56,23 +56,26 @@ def evaluate_optimizer(
     if importlib.util.find_spec("ompl") is not None:  # Reduce OMPL logging
         import ompl.util
         ompl.util.setLogLevel(ompl.util.LOG_WARN)
-    with logging_redirect_tqdm([logging.getLogger(), ]):
-        for step, task in tqdm(enumerate(task_generator.as_finite_iterable()), desc="Tasks"):
-            task_solver = config.get_task_solver(task)
-            base_change_environment = BaseChangeEnvironment(assembly=config.ASSEMBLY, task_solver=task_solver,
-                                                            task=task, reward_fail=reward_fail,
-                                                            cost_function=config.COST_FUNCTION,
-                                                            observations=observations,
-                                                            action2base_pose=action_space,)
-            # penalty_ik_distance=1.,  # TODO make configurable
-            # penalty_filter_fails=1.)  # TODO make configurable
-            # TODO make configurable, e.g., deterministic=False
-            ret[task.id] = optimizer.optimize(base_change_environment, timeout=timeout)[2]
-            if trial is not None:
-                trial.report(np.mean([r.history.best_reward for r in ret.values()]), step=step)
-                if trial.should_prune():
-                    return ret  # Return intermediate results for logging
-
+    try:
+        with logging_redirect_tqdm([logging.getLogger(), ]):
+            for step, task in tqdm(enumerate(task_generator.as_finite_iterable()), desc="Tasks",
+                                   total=len(task_generator.as_finite_iterable())):
+                task_solver = config.get_task_solver(task)
+                base_change_environment = BaseChangeEnvironment(assembly=config.ASSEMBLY, task_solver=task_solver,
+                                                                task=task, reward_fail=reward_fail,
+                                                                cost_function=config.COST_FUNCTION,
+                                                                observations=observations,
+                                                                action2base_pose=action_space,)
+                # penalty_ik_distance=1.,  # TODO make configurable
+                # penalty_filter_fails=1.)  # TODO make configurable
+                # TODO make configurable, e.g., deterministic=False
+                ret[task.id] = optimizer.optimize(base_change_environment, timeout=timeout)[2]
+                if trial is not None:
+                    trial.report(np.mean([r.history.best_reward for r in ret.values()]), step=step)
+                    if trial.should_prune():
+                        return ret  # Return intermediate results for logging
+    except KeyboardInterrupt:
+        logging.warning(f"Evaluation interrupted after {len(ret)} of {len(task_generator.as_finite_iterable())}.")
     return ret
 
 

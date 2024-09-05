@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 from pygad import pygad
 import skopt
+import torch.optim
 
 from mcs.optimize.Sampler import GridSampler
 from timor import Transformation
@@ -299,6 +300,138 @@ class RandomBaseOptimizer(BaseOptimizerBase):
             self._evaluate(action)
 
 
+class GradientOptimizer(RandomBaseOptimizer):
+    """Gradient optimizer that follows the gradient towards a locally good robot base pose."""
+
+    def __init__(self, hp: Dict, solution_storage: Optional[Path] = None):
+        """
+        Initialize with number of local search steps and IK steps to take.
+
+        :param hp: Dict of hyperparameters for the optimizer.
+                     * local_search_steps: Number of local search steps to take to optimize random guess (default 10).
+                     * local_ik_steps: Number of inverse kinematics (IK) steps to take in each local search step
+                                       (default 100). With this the joint angles are adapted to the changed base pose
+                                       to minimize the distance to the goal poses.
+        """
+        super().__init__(hp, solution_storage)
+        self._local_search_steps = hp.get("local_search_steps", 10)
+        self._local_ik_steps = hp.get("local_ik_steps", 100)
+
+    @property
+    def specs(self) -> Dict:
+        """Return a dictionary with the specs of the optimizer."""
+        return {"alg": "GradientOptimizer",
+                "local_search_steps": self._local_search_steps,
+                "local_ik_steps": self._local_ik_steps}
+
+    def _next_action(self, env: BaseChangeEnvironment) -> np.ndarray:
+        """Return the next action to take."""
+        guess = env.action_space.sample()
+        return self._improve_guess(env, guess)
+
+    @abc.abstractmethod
+    def _take_local_step(self, env: BaseChangeEnvironment, T_closest: Dict[str, Transformation],
+                         guess: np.ndarray) -> np.ndarray:
+        """
+        Take a local step towards a better robot base pose; return that better action.
+
+        :param env: The environment to optimize in.
+        :param T_closest: The closest end-effector poses found for each goal for the current guess with inv. kin.
+        :param guess: The current guess for the action (= parameters of base pose) to take.
+        """
+        pass
+
+    def _improve_guess(self, env: BaseChangeEnvironment, guess: np.ndarray) -> np.ndarray:
+        """
+        Improve the guess by taking local steps towards a better robot base pose.
+        """
+        robot = env.task_solver.robot
+        q_closest = {}
+        for _ in range(self._local_search_steps):
+            guess_base = env.action2base_pose(guess)
+            robot.set_base_placement(guess_base)
+            q_closest = {g.id: robot.ik(g.goal_pose, max_iter=self._local_ik_steps,
+                                        q_init=q_closest[g.id][0] if g.id in q_closest else None)
+                         for g in env.task.goals}
+            if all(ik_res[1] for ik_res in q_closest.values()):  # Short circuit if all goals are already solved
+                return guess
+            T_closest = {g_id: guess_base.inv @ robot.fk(q) for g_id, (q, _) in q_closest.items()}
+            guess = self._take_local_step(env, T_closest, guess)
+        return guess
+
+
+class AdamOptimizer(GradientOptimizer):
+    """
+    Use adam for choosing local steps relative to gradient.
+
+    :cite: https://arxiv.org/abs/1412.6980
+    """
+
+    best_hps = config.known_hyperparameters["AdamOptimizer"]["best"]
+
+    def __init__(self, hp: Dict, solution_storage: Optional[Path] = None,
+                 dtype: torch.dtype = torch.float32):
+        """Initialize with learning rate (and dtype) for the adam optimizer."""
+        self.hp = deepcopy(self.best_hps)
+        super().__init__(self.hp, solution_storage)
+        self.hp.update(hp)
+        self._dtype = dtype
+
+    @property
+    def specs(self) -> Dict:
+        """Return a dictionary with the specs of the optimizer."""
+        ret = super().specs
+        ret.update({"alg": "AdamOptimizer", **self.hp})
+        return ret
+
+    def _reset_next_action(self, env: BaseChangeEnvironment):
+        self._param = torch.tensor(env.action_space.sample(), requires_grad=True)
+        self._opt = torch.optim.Adam(
+            [self._param, ], lr=self.hp["lr"], betas=(self.hp["beta1"], self.hp["beta2"]))
+        self._env = env
+
+    def _tensor_ik_cost_function(self, action: torch.Tensor, eef_is: torch.Tensor, eef_goal: torch.Tensor):
+        """PyTorch Version of the default IK cost function in timor.robot.Robot."""
+        base = self._env.action2base_pose(action)
+        eef = base @ eef_is  # Pose of end-effector with this base pose
+        eef_inv = torch.eye(4, dtype=self._dtype)
+        eef_inv[:3, :3] = eef[:3, :3].t()  # Inverse of rotation is transposed
+        eef_inv[:3, 3] = -eef[:3, :3].t() @ eef[:3, 3]  # Inverse of end-effector position
+        delta = eef_inv @ eef_goal
+        translation_error = delta[:3, 3].norm(dim=-1)
+        if delta[:3, :3].trace() > 2.999:  # cut off boundaries of rotation
+            rotation_error = 0.
+        elif delta[:3, :3].trace() < -0.9999:  # cut off boundaries of rotation
+            rotation_error = np.pi
+        else:
+            rotation_error = torch.acos((delta[:3, :3].trace() - 1) / 2)  # angle of rotation via Rodrigues formula
+        translation_weight = 1.  # Same as timor.robot.Robot.default_ik_cost_function
+        rotation_weight = .5 / np.pi
+        return (translation_weight * translation_error + rotation_weight * rotation_error) / \
+            (translation_weight + rotation_weight)
+
+    def _take_local_step(self, env: BaseChangeEnvironment, T_closest: Dict[str, Transformation],
+                         guess: np.ndarray) -> np.ndarray:
+        """
+        Use adam to take a local step towards a better robot base pose.
+        """
+        self._param.data = torch.tensor(guess, dtype=self._dtype)  # Set initial guess
+        self._opt.zero_grad()
+        with torch.autograd.detect_anomaly():  # Detect any nan or inf in gradients
+            # Calculate cost for each goal
+            tmp_cost = {g_id: self._tensor_ik_cost_function(
+                        self._param,
+                        torch.tensor(T.homogeneous, dtype=self._dtype),
+                        torch.tensor(
+                            env.task.goals_by_id[g_id].goal_pose.nominal.in_world_coordinates().homogeneous,
+                            dtype=self._dtype))
+                        for g_id, T in T_closest.items()}
+            mean_cost = torch.mean(torch.stack(list(tmp_cost.values())))
+            mean_cost.backward(retain_graph=True, create_graph=True)
+        self._opt.step()
+        return self._param.detach().numpy().clip(env.action_space.low, env.action_space.high)
+
+
 class DummyOptimizer(RandomBaseOptimizer):
     """Always return central action."""
 
@@ -438,4 +571,5 @@ str_to_base_optimizer = {
     "RandomGrid": RandomGrid,
     "GAOptimizer": GAOptimizer,
     "BOOptimizer": BOOptimizer,
+    "AdamOptimizer": AdamOptimizer
 }

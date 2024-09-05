@@ -10,6 +10,7 @@ import time
 import unittest
 import numpy as np
 import numpy.testing as np_test
+import torch
 
 import cobra.task.task
 
@@ -182,6 +183,27 @@ class BaseChangeEnvironmentTests(unittest.TestCase):
                 self.assertTrue(any(isinstance(f, RobotLongEnoughFilter) for f in info['failed_filters']))
                 self.assertFalse(info['is_success'])
         self.assertLess(np.mean(run_times), .2)  # Should be quick on average  # TODO: Needs better robot len filter
+
+    def test_action_transformation_map_pytorch(self, n_trials=100):
+        """
+        Test that the action transformation map works as expected with pytorch and
+
+        consistent with main implementation. Check that gradients are computed.
+        """
+        env_xyz = Proxies.BaseChangeEnvironment(self.assembly, self.task_solver, CostFunctions.CycleTime(),
+                                                action2base_pose='xyz')
+        env_xyz_rotvec = Proxies.BaseChangeEnvironment(self.assembly, self.task_solver, CostFunctions.CycleTime(),
+                                                       action2base_pose='xyz_rotvec')
+        for env in (env_xyz, env_xyz_rotvec):
+            for _ in range(n_trials):
+                a = env.action_space.sample()
+                a_torch = torch.tensor(a, requires_grad=True)
+                T_normal = env._action2base_pose(a, env.task.base_constraint)
+                T_torch = env._action2base_pose(a_torch, env.task.base_constraint)
+                np_test.assert_almost_equal(T_torch.detach().numpy(), T_normal.homogeneous, decimal=5)
+                T_torch.sum().backward()
+                self.assertIsNotNone(a_torch.grad)
+                np_test.assert_array_less(1e-5, np.abs(a_torch.grad.numpy()))  # Highly unlikely that any 0 gradient
 
 
 if __name__ == '__main__':
