@@ -34,7 +34,8 @@ It can be viewed, e.g., with the optuna dashboard: `optuna-dashboard --port 6006
 2. Evaluation of the best hyperparameters [run_evaluation.sh](experiments/run_evaluation.sh)
 We suggest running the evaluation with [GNU parallel](https://www.gnu.org/software/parallel/) over task sets/action spaces/seed/algorithm combinations as done in [run_evaluation.sh](experiments/run_evaluation.sh).
 The main output are a set of csv files per task set, action space, algorithm, and seed combination, logs of errors/stdout per run are stored alongside.
-The results for our analysis are provided in the [data/outdir_test_1200 folder](data/outdir_test_1200).
+The results for our analysis are provided in the [data/outdir_test_1200 folder](data/outdir_test_1200); our resulting data is provided as a [zip](data/outdir_test_1200.zip).
+The best solutions uploaded to [CoBRA](https://cobra.cps.cit.tum.de) are provided in [best_solutions.zip](data/best_solutions.zip).
 
 We note that the experiments are computationally expensive and require a lot of CPU time and memory (order of 1000s CPU hours).
 
